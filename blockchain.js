@@ -4,7 +4,8 @@
  * This function is internal to this module and not exported.
  */
 const simpleHash = (data) => {
-    const str = JSON.stringify(data);
+    // Create a canonical, ordered string for consistent hashing
+    const str = JSON.stringify(data, Object.keys(data).sort());
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
         const char = str.charCodeAt(i);
@@ -17,20 +18,25 @@ const simpleHash = (data) => {
 /**
  * Creates a new block object.
  * @param {number} index - The block's position in the chain.
- * @param {object} transaction - The data for this block.
+ * @param {object} transaction - The data for this block (must be the full, rich object).
  * @param {string} previousHash - The hash of the preceding block.
  * @returns {object} A new block object with its hash calculated.
  */
 function createBlock(index, transaction, previousHash) {
     const timestamp = new Date().toISOString();
+    
+    // Create the block *data* that will be hashed
     const blockData = {
         index,
         timestamp,
         transaction,
         previousHash,
     };
+    
     // The hash is calculated from the block's data
     const hash = simpleHash(blockData);
+    
+    // Return the full block, including its new hash
     return { ...blockData, hash };
 }
 
@@ -39,8 +45,7 @@ function createBlock(index, transaction, previousHash) {
  * @returns {object} The Genesis block.
  */
 function createGenesisBlock() {
-    // A Genesis block has index 0, a 'GENESIS' transaction, and a '0' previous hash
-    return createBlock(0, { type: "GENESIS" }, "0");
+    return createBlock(0, { txType: "GENESIS" }, "0");
 }
 
 /**
@@ -56,7 +61,7 @@ function isChainValid(blockchainArray) {
 
         // 1. Check if the stored previousHash matches the actual previous block's hash
         if (currentBlock.previousHash !== previousBlock.hash) {
-            console.error("Chain invalid: previousHash mismatch at block " + i);
+            console.error(`Chain invalid: previousHash mismatch at block ${i}. Expected ${previousBlock.hash} but got ${currentBlock.previousHash}`);
             return false;
         }
 
@@ -71,10 +76,11 @@ function isChainValid(blockchainArray) {
         const recalculatedHash = simpleHash(blockDataToRecalculate);
 
         if (currentBlock.hash !== recalculatedHash) {
-            console.error("Chain invalid: Hash mismatch at block " + i);
+            console.error(`Chain invalid: Hash mismatch at block ${i}. Expected ${currentBlock.hash} but got ${recalculatedHash}`);
             return false;
         }
     }
     // If all blocks pass, the chain is valid
     return true;
 }
+

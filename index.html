@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Blockchain Inventory Management</title>
+    <title>BIMS - Blockchain Inventory Management</title>
     <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Load Inter font -->
@@ -12,134 +12,85 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <!-- Load Custom Stylesheet -->
     <link rel="stylesheet" href="style.css">
+    <!-- Load Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web@2.0.3"></script>
 </head>
 <body class="bg-slate-100 text-slate-900">
 
-    <div class="container mx-auto max-w-7xl p-4 md:p-8">
-        
-        <!-- Header -->
-        <header class="mb-8">
-            <h1 class="text-4xl font-bold text-indigo-600">Blockchain Inventory Demo</h1>
-            <p class="mt-2 text-lg text-slate-600">
-                See how a blockchain provides an immutable, transparent ledger for supply chain management.
-                Actions update the "Current Inventory" (the state) and are permanently recorded on the "Blockchain Ledger" (the history).
-                <strong class="text-indigo-700">Now with persistent storage!</strong>
-            </p>
-        </header>
-
-        <!-- Main Grid Layout -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-
-            <!-- Column 1: Actions -->
-            <div class="lg:col-span-1 space-y-8">
-                
-                <!-- Add Item Form -->
-                <div class="bg-white p-6 rounded-lg shadow-md">
-                    <h2 class="text-2xl font-semibold mb-4 text-slate-800">1. Add New Item</h2>
-                    <p class="text-sm text-slate-500 mb-4">Simulate a supplier adding new products to the system.</p>
-                    <form id="add-item-form" class="space-y-4">
-                        <div>
-                            <label for="add-product-id" class="block text-sm font-medium text-slate-700">Product ID (SKU)</label>
-                            <input type="text" id="add-product-id" value="SKU-101" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" required>
-                        </div>
-                        <div>
-                            <label for="add-product-name" class="block text-sm font-medium text-slate-700">Product Name</label>
-                            <input type="text" id="add-product-name" value="Smart Watch" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" required>
-                        </div>
-                        <div>
-                            <label for="add-quantity" class="block text-sm font-medium text-slate-700">Quantity</label>
-                            <input type="number" id="add-quantity" value="100" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" required>
-                        </div>
-                        <div>
-                            <label for="add-to" class="block text-sm font-medium text-slate-700">Add to Location</label>
-                            <select id="add-to" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                <option>Supplier</option>
-                                <option>Warehouse</option>
-                            </select>
-                        </div>
-                        <button type="submit" class="w-full bg-indigo-600 text-white py-2 px-4 rounded-md shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
-                            Add Item (Create Transaction)
-                        </button>
-                    </form>
+    <!-- Login Overlay -->
+    <div id="login-overlay" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900 bg-opacity-75 backdrop-blur-sm">
+        <div class="bg-white p-8 rounded-lg shadow-2xl w-full max-w-sm">
+            <h2 class="text-3xl font-bold text-center text-indigo-600 mb-6">BIMS Login</h2>
+            <p class="text-center text-slate-600 mb-6">Select a mock user role to begin.</p>
+            <form id="login-form" class="space-y-4">
+                <div>
+                    <label for="login-email" class="block text-sm font-medium text-slate-700">Email (Select User)</label>
+                    <select id="login-email" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" required>
+                        <!-- Options will be populated by app.js -->
+                    </select>
                 </div>
-
-                <!-- Move Item Form -->
-                <div class="bg-white p-6 rounded-lg shadow-md">
-                    <h2 class="text-2xl font-semibold mb-4 text-slate-800">2. Move Item</h2>
-                    <p class="text-sm text-slate-500 mb-4">Simulate moving items between locations in the supply chain.</p>
-                    <form id="move-item-form" class="space-y-4">
-                        <div>
-                            <label for="move-product-id" class="block text-sm font-medium text-slate-700">Product ID (SKU)</label>
-                            <select id="move-product-id" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" required>
-                                <!-- Options will be populated by JS -->
-                            </select>
-                        </div>
-                        <div>
-                            <label for="move-quantity" class="block text-sm font-medium text-slate-700">Quantity</label>
-                            <input type="number" id="move-quantity" value="25" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" required>
-                        </div>
-                        <div>
-                            <label for="move-from" class="block text-sm font-medium text-slate-700">From Location</label>
-                            <select id="move-from" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                <option selected>Supplier</option>
-                                <option>Warehouse</option>
-                                <option>Retailer</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label for="move-to" class="block text-sm font-medium text-slate-700">To Location</label>
-                            <select id="move-to" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                <option>Supplier</option>
-                                <option selected>Warehouse</option>
-                                <option>Retailer</option>
-                            </select>
-                        </div>
-                        <button type="submit" class="w-full bg-blue-600 text-white py-2 px-4 rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
-                            Move Item (Create Transaction)
-                        </button>
-                    </form>
+                <div>
+                    <label for="login-password" class="block text-sm font-medium text-slate-700">Password</label>
+                    <input type="password" id="login-password" value="password" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" required>
+                    <p class="text-xs text-slate-500 mt-1">Use "password" for any mock user.</p>
                 </div>
-                
-                <!-- Database Options -->
-                <div class="bg-white p-6 rounded-lg shadow-md">
-                    <h2 class="text-2xl font-semibold mb-4 text-slate-800">Database Options</h2>
-                    <p class="text-sm text-slate-500 mb-4">The blockchain is saved in your browser's local storage.</p>
-                    <div class="space-y-3">
-                        <button id="verify-chain-button" class="w-full bg-teal-600 text-white py-2 px-4 rounded-md shadow-sm hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2">
-                            Verify Blockchain
-                        </button>
-                        <button id="clear-db-button" class="w-full bg-red-600 text-white py-2 px-4 rounded-md shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2">
-                            Clear Database & Reset
-                        </button>
-                    </div>
-                </div>
-
-            </div>
-
-            <!-- Column 2: Current Inventory State -->
-            <div class="lg:col-span-1">
-                <div class="bg-white p-6 rounded-lg shadow-md sticky top-8">
-                    <h2 class="text-2xl font-semibold mb-4 text-slate-800">Current Inventory (The "World State")</h2>
-                    <p class="text-sm text-slate-500 mb-4">This is the current "truth" of the inventory, derived by processing all transactions on the blockchain.</p>
-                    <div id="inventory-display" class="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
-                        <!-- Inventory will be rendered here by JS -->
-                        <p class="text-slate-500">No items in inventory. Add some!</p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Column 3: Blockchain Ledger -->
-            <div class="lg:col-span-1">
-                <div class="bg-white p-6 rounded-lg shadow-md">
-                    <h2 class="text-2xl font-semibold mb-4 text-slate-800">Blockchain Ledger (Immutable History)</h2>
-                    <p class="text-sm text-slate-500 mb-4">A new block is added for every transaction. This log is permanent and verifiable. (Newest block on top).</p>
-                    <div id="ledger-display" class="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
-                        <!-- Ledger blocks will be rendered here by JS -->
-                    </div>
-                </div>
-            </div>
-
+                <button type="submit" class="w-full bg-indigo-600 text-white py-2 px-4 rounded-md shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+                    Login
+                </button>
+            </form>
         </div>
+    </div>
+
+    <!-- Main Application Wrapper (Hidden by default) -->
+    <div id="app-wrapper" class="flex h-screen hidden">
+        <!-- Sidebar Navigation -->
+        <nav class="w-64 bg-white shadow-lg flex flex-col">
+            <div class="p-4 border-b border-slate-200">
+                <h1 class="text-2xl font-bold text-indigo-600">BIMS</h1>
+                <p class="text-sm text-slate-500">Inventory Management</p>
+            </div>
+            
+            <!-- User Profile Section -->
+            <div class="p-4 border-b border-slate-200">
+                <h3 id="user-name" class="font-semibold text-slate-800"></h3>
+                <p id="user-role" class="text-sm text-indigo-600 font-medium"></p>
+                <p id="user-employee-id" class="text-xs text-slate-500 mt-1"></p>
+                <button id="logout-button" class="w-full text-left text-sm text-red-600 hover:text-red-800 font-medium mt-3">
+                    Logout
+                </button>
+            </div>
+
+            <!-- Navigation Links -->
+            <ul class="flex-1 p-2 space-y-1">
+                <li>
+                    <a href="#" id="nav-dashboard" class="nav-link">
+                        <i class="ph-bold ph-chart-pie-slice"></i> Dashboard
+                    </a>
+                </li>
+                <li>
+                    <a href="#" id="nav-products" class_name="nav-link">
+                        <i class="ph-bold ph-package"></i> Products
+                    </a>
+                </li>
+                <li>
+                    <a href="#" id="nav-admin" class="nav-link">
+                        <i class="ph-bold ph-users"></i> Admin
+                    </a>
+                </li>
+                <li>
+                    <a href="#" id="nav-ledger" class="nav-link">
+                        <i class="ph-bold ph-cube"></i> Full Ledger
+                    </a>
+                </li>
+            </ul>
+        </nav>
+
+        <!-- Main Content Area -->
+        <main class="flex-1 bg-slate-100 overflow-y-auto">
+            <div id="app-content" class="p-4 md:p-8">
+                <!-- App views (Dashboard, Product List, etc.) will be rendered here -->
+            </div>
+        </main>
     </div>
 
     <!-- Error Toast -->
@@ -152,10 +103,243 @@
         <span id="success-message"></span>
     </div>
 
+
+    <!-- 
+      TEMPLATES 
+      These are hidden by default and cloned by app.js to render views
+    -->
+
+    <!-- Template for the Dashboard View -->
+    <template id="dashboard-view-template">
+        <div class="space-y-8">
+            <h1 class="text-4xl font-bold text-slate-800">Dashboard</h1>
+            
+            <!-- KPI Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h3 class="text-sm font-medium text-slate-500 uppercase">Total SKUs</h3>
+                    <p id="kpi-total-skus" class="text-4xl font-bold text-indigo-600">0</p>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h3 class="text-sm font-medium text-slate-500 uppercase">Total Units</h3>
+                    <p id="kpi-total-units" class="text-4xl font-bold text-indigo-600">0</p>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h3 class="text-sm font-medium text-slate-500 uppercase">Chain Length</h3>
+                    <p id="kpi-chain-length" class="text-4xl font-bold text-indigo-600">0</p>
+                </div>
+            </div>
+
+            <!-- Database & Verification -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h2 class="text-2xl font-semibold mb-4 text-slate-800">Database Options</h2>
+                    <p class="text-sm text-slate-500 mb-4">The blockchain is saved in your browser's local storage.</p>
+                    <button id="clear-db-button" class="w-full bg-red-600 text-white py-2 px-4 rounded-md shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 flex items-center justify-center gap-2">
+                        <i class="ph-bold ph-trash"></i>
+                        Clear Database & Reset
+                    </button>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h2 class="text-2xl font-semibold mb-4 text-slate-800">Chain Integrity</h2>
+                    <p class="text-sm text-slate-500 mb-4">Verify the immutability of the ledger.</p>
+                    <button id="verify-chain-button" class="w-full bg-teal-600 text-white py-2 px-4 rounded-md shadow-sm hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 flex items-center justify-center gap-2">
+                        <i class="ph-bold ph-check-shield"></i>
+                        Verify Blockchain
+                    </button>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- Template for the Product List View -->
+    <template id="product-list-view-template">
+        <div class="space-y-8">
+            <!-- Add Item Form (Admin Only) -->
+            <div id="add-item-container" class="bg-white p-6 rounded-lg shadow-md">
+                <h2 class="text-2xl font-semibold mb-4 text-slate-800">Add New Product Type</h2>
+                <p class="text-sm text-slate-500 mb-4">Add a new product (SKU) to the inventory system. Initial stock will be added to the 'Supplier'.</p>
+                <form id="add-item-form" class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="add-product-id" class="block text-sm font-medium text-slate-700">Product ID (SKU)</label>
+                            <input type="text" id="add-product-id" value="SKU-101" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" required>
+                        </div>
+                        <div>
+                            <label for="add-product-name" class="block text-sm font-medium text-slate-700">Product Name</label>
+                            <input type="text" id="add-product-name" value="Smart Watch" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" required>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="add-quantity" class="block text-sm font-medium text-slate-700">Initial Quantity</label>
+                            <input type="number" id="add-quantity" value="100" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" required>
+                        </div>
+                        <div>
+                            <label for="add-to" class="block text-sm font-medium text-slate-700">Add to Location</label>
+                            <select id="add-to" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                <option>Supplier</option>
+                                <option>Warehouse</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button type="submit" class="w-full md:w-auto bg-indigo-600 text-white py-2 px-6 rounded-md shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 flex items-center justify-center gap-2">
+                        <i class="ph-bold ph-plus-circle"></i>
+                        Add Product
+                    </button>
+                </form>
+            </div>
+
+            <!-- Product Grid -->
+            <div>
+                <h2 class="text-3xl font-semibold mb-4 text-slate-800">Product Inventory</h2>
+                <div id="product-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <!-- Product cards will be rendered here by JS -->
+                </div>
+            </div>
+        </div>
+    </template>
+
+
+    <!-- Template for the Product Detail View -->
+    <template id="product-detail-view-template">
+        <div class="space-y-8">
+            <!-- Back Button -->
+            <div>
+                <button id="back-to-list-button" class="inline-flex items-center gap-2 text-sm font-medium text-indigo-600 hover:text-indigo-800">
+                    <i class="ph-bold ph-arrow-left"></i>
+                    Back to All Products
+                </button>
+            </div>
+        
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <!-- Left Column: Product Info & Stock Update -->
+                <div class="lg:col-span-2 space-y-8">
+                    <!-- Product Header -->
+                    <div class="bg-white p-6 rounded-lg shadow-md">
+                        <div class="flex flex-col md:flex-row gap-6">
+                            <!-- Placeholder Image -->
+                            <div class="w-full md:w-1/3 h-48 bg-slate-200 rounded-lg flex items-center justify-center">
+                                <i class="ph-bold ph-package text-slate-400 text-6xl"></i>
+                            </div>
+                            <!-- Product Info -->
+                            <div class="w-full md:w-2/3">
+                                <h2 id="detail-product-name" class="text-4xl font-bold text-slate-900">Product Name</h2>
+                                <p id="detail-product-id" class="text-sm text-slate-500 mt-1">SKU-000</p>
+                                <hr class="my-4">
+                                <h3 class="text-lg font-semibold text-slate-800 mb-2">Current Stock Levels</h3>
+                                <div id="detail-stock-levels" class="space-y-2">
+                                    <!-- Stock levels rendered by JS -->
+                                </div>
+                                <hr class="my-4">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-lg font-semibold text-slate-800">Total Stock:</span>
+                                    <span id="detail-total-stock" class="text-2xl font-bold text-indigo-600">0</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Update Stock Form (Manager/Admin Only) -->
+                    <div id="update-stock-container" class="bg-white p-6 rounded-lg shadow-md">
+                        <h2 class="text-2xl font-semibold mb-4 text-slate-800">Update Stock</h2>
+                        <p class="text-sm text-slate-500 mb-4">Move, add (Stock In), or remove (Stock Out) items for this product.</p>
+                        <form id="update-stock-form" class="space-y-4">
+                            <input type="hidden" id="update-product-id" value="">
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label for="update-action-type" class="block text-sm font-medium text-slate-700">Action Type</label>
+                                    <select id="update-action-type" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                        <option value="MOVE" selected>Move Stock (From -> To)</option>
+                                        <option value="STOCK_IN">Stock In (Add to location)</option>
+                                        <option value="STOCK_OUT">Stock Out (Remove from location)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label for="update-quantity" class="block text-sm font-medium text-slate-700">Quantity</label>
+                                    <input type="number" id="update-quantity" value="10" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" required>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div id="from-location-group">
+                                    <label for="update-from" class="block text-sm font-medium text-slate-700">From Location</label>
+                                    <select id="update-from" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                        <option selected>Supplier</option> <option>Warehouse</option> <option>Retailer</option>
+                                    </select>
+                                </div>
+                                <div id="to-location-group">
+                                    <label for="update-to" class="block text-sm font-medium text-slate-700">To Location</label>
+                                    <select id="update-to" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                        <option>Supplier</option> <option selected>Warehouse</option> <option>Retailer</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <button type="submit" class="w-full md:w-auto bg-blue-600 text-white py-2 px-6 rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex items-center justify-center gap-2">
+                                <i class="ph-bold ph-arrows-counter-clockwise"></i>
+                                Submit Update
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Right Column: Item History (Auditor feature) -->
+                <div class="lg:col-span-1">
+                    <div class="bg-white p-6 rounded-lg shadow-md sticky top-8">
+                        <h2 class="text-2xl font-semibold mb-4 text-slate-800">Item History</h2>
+                        <p class="text-sm text-slate-500 mb-4">Immutable transaction log for this item.</p>
+                        <div id="item-history-display" class="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
+                            <!-- Item history will be rendered here by JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- Template for the Full Ledger View -->
+    <template id="ledger-view-template">
+        <div class="space-y-8">
+            <h1 class="text-4xl font-bold text-slate-800">Full Blockchain Ledger</h1>
+            <p class="text-lg text-slate-600">The immutable history of all transactions across all products. (Newest block on top).</p>
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <div id="full-ledger-display" class="space-y-4 max-h-[80vh] overflow-y-auto pr-2">
+                    <!-- Full ledger will be rendered here by JS -->
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- Template for the Admin View -->
+    <template id="admin-view-template">
+        <div class="space-y-8">
+            <h1 class="text-4xl font-bold text-slate-800">Admin Panel</h1>
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <h2 class="text-2xl font-semibold mb-4 text-slate-800">User Management</h2>
+                <p class="text-sm text-slate-500 mb-4">Manage user roles (simulated). Changes are saved to local storage.</p>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-slate-200">
+                        <thead class="bg-slate-50">
+                            <tr>
+                                <th class="table-header">Name</th>
+                                <th class="table-header">Employee ID</th>
+                                <th class="table-header">Email</th>
+                                <th class="table-header">Role</th>
+                            </tr>
+                        </thead>
+                        <tbody id="user-management-table" class="bg-white divide-y divide-slate-200">
+                            <!-- User rows will be rendered here by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </template>
+
+
     <!-- Load Scripts -->
-    <!-- Core blockchain logic -->
     <script src="blockchain.js"></script>
-    <!-- Main application logic (must be deferred to run after DOM parsing) -->
     <script src="app.js" defer></script>
 </body>
 </html>
+
