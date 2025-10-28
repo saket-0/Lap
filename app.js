@@ -1,24 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
-
-    // --- MOCK DATABASE & AUTH ---
-    // (Simulating PostgreSQL tables from the SRS)
-
-    const MOCK_USERS = [
-        { id: 'uuid-admin-001', employeeId: 'EMP-20251029-0001', name: 'Dr. Evelyn Reed', email: 'admin@bims.com', role: 'Admin' },
-        { id: 'uuid-manager-002', employeeId: 'EMP-20251029-0002', name: 'Marcus Cole', email: 'manager@bims.com', role: 'Inventory Manager' },
-        { id: 'uuid-auditor-003', employeeId: 'EMP-20251029-0003', name: 'Anya Sharma', email: 'auditor@bims.com', role: 'Auditor' }
-    ];
     
-    const DB_KEY = 'bimsChain'; // For the blockchain
-    const AUTH_KEY = 'bimsUser'; // For the current user
-    const USERS_KEY = 'bimsUsers'; // For the list of users (for Admin panel)
-
-    // --- STATE MANAGEMENT ---
-    let blockchain = [];
-    let inventory = new Map(); // The "World State"
-    let currentUser = null;
-    let usersDb = [];
-
     // --- DOM ELEMENTS ---
     const loginOverlay = document.getElementById('login-overlay');
     const loginForm = document.getElementById('login-form');
@@ -50,92 +31,6 @@ document.addEventListener('DOMContentLoaded', () => {
         ledger: document.getElementById('ledger-view-template'),
     };
 
-    // --- SERVICES (Simulating Backend Logic) ---
-
-    /**
-     * Authentication Service (Mock)
-     */
-    const authService = {
-        init: () => {
-            // Populate user select
-            MOCK_USERS.forEach(user => {
-                const option = document.createElement('option');
-                option.value = user.email;
-                option.textContent = `${user.name} (${user.role})`;
-                loginEmailSelect.appendChild(option);
-            });
-            
-            // Populate users DB (simulates user table)
-            if (!localStorage.getItem(USERS_KEY)) {
-                localStorage.setItem(USERS_KEY, JSON.stringify(MOCK_USERS));
-            }
-            usersDb = JSON.parse(localStorage.getItem(USERS_KEY));
-
-            // Check for logged-in user
-            const savedUser = localStorage.getItem(AUTH_KEY);
-            if (savedUser) {
-                currentUser = JSON.parse(savedUser);
-                showApp();
-            } else {
-                showLogin();
-            }
-        },
-        login: (email, password) => {
-            if (password !== 'password') {
-                showError("Invalid password. (Hint: use 'password')");
-                return;
-            }
-            const user = usersDb.find(u => u.email === email);
-            if (user) {
-                currentUser = user;
-                localStorage.setItem(AUTH_KEY, JSON.stringify(currentUser));
-                showApp();
-            } else {
-                showError("User not found.");
-            }
-        },
-        logout: () => {
-            currentUser = null;
-            localStorage.removeItem(AUTH_KEY);
-            showLogin();
-        }
-    };
-
-    /**
-     * Permission Service (Mock)
-     */
-    const permissionService = {
-        can: (action) => {
-            if (!currentUser) return false;
-            const role = currentUser.role;
-
-            switch (action) {
-                case 'VIEW_DASHBOARD':
-                    return true;
-                case 'VIEW_PRODUCTS':
-                    return true;
-                case 'CREATE_ITEM':
-                    return role === 'Admin';
-                case 'UPDATE_STOCK': // Add, Remove, Move
-                    return role === 'Admin' || role === 'Inventory Manager';
-                case 'VIEW_ITEM_HISTORY':
-                    return true;
-                case 'VIEW_ADMIN_PANEL':
-                    return role === 'Admin';
-                case 'MANAGE_USERS':
-                    return role === 'Admin';
-                case 'VIEW_LEDGER':
-                    return role === 'Admin' || role === 'Auditor';
-                case 'VERIFY_CHAIN':
-                    return role === 'Admin' || role === 'Auditor';
-                case 'CLEAR_DB':
-                    return role === 'Admin';
-                default:
-                    return false;
-            }
-        }
-    };
-
     // --- NAVIGATION & UI CONTROL ---
 
     const showLogin = () => {
@@ -148,16 +43,17 @@ document.addEventListener('DOMContentLoaded', () => {
         appWrapper.classList.remove('hidden');
         
         // Update user info in sidebar
-        document.getElementById('user-name').textContent = currentUser.name;
-        document.getElementById('user-role').textContent = currentUser.role;
-        document.getElementById('user-employee-id').textContent = currentUser.employeeId;
+        const user = currentUser; // 'currentUser' is from core.js
+        document.getElementById('user-name').textContent = user.name;
+        document.getElementById('user-role').textContent = user.role;
+        document.getElementById('user-employee-id').textContent = user.employeeId;
 
         // Show/hide nav links based on role
         navLinks.admin.style.display = permissionService.can('VIEW_ADMIN_PANEL') ? 'flex' : 'none';
         navLinks.ledger.style.display = permissionService.can('VIEW_LEDGER') ? 'flex' : 'none';
 
-        loadBlockchain();
-        rebuildInventoryState();
+        loadBlockchain(); // from core.js
+        rebuildInventoryState(); // from core.js
         navigateTo('dashboard');
     };
 
@@ -208,74 +104,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 break;
         }
     };
-
-    // --- CORE LOGIC (Blockchain & Inventory) ---
-
-    const addTransactionToChain = (transaction) => {
-        const index = blockchain.length;
-        const previousHash = blockchain[blockchain.length - 1].hash;
-        const newBlock = createBlock(index, transaction, previousHash); // from blockchain.js
-        blockchain.push(newBlock);
-        saveBlockchain();
-    };
-
-    const processTransaction = (transaction, suppressErrors = false) => {
-        const { txType, itemSku, itemName, quantity, fromLocation, toLocation, location } = transaction;
-
-        let product;
-        if (txType !== 'CREATE_ITEM' && !inventory.has(itemSku)) {
-            showError(`Product ${itemSku} not found.`, suppressErrors);
-            return false;
-        }
-        
-        if (txType !== 'CREATE_ITEM') {
-            product = inventory.get(itemSku);
-        }
-
-        switch (txType) {
-            case 'CREATE_ITEM':
-                if (inventory.has(itemSku) && !suppressErrors) {
-                    showError(`Product SKU ${itemSku} already exists.`);
-                    return false;
-                }
-                if (!inventory.has(itemSku)) {
-                     inventory.set(itemSku, {
-                        productName: itemName,
-                        locations: new Map()
-                    });
-                }
-                product = inventory.get(itemSku);
-                const currentAddQty = product.locations.get(toLocation) || 0;
-                product.locations.set(toLocation, currentAddQty + quantity);
-                return true;
-        
-            case 'MOVE':
-                const fromQty = product.locations.get(fromLocation) || 0;
-                if (fromQty < quantity) {
-                    showError(`Insufficient stock at ${fromLocation}. Only ${fromQty} available.`, suppressErrors);
-                    return false;
-                }
-                const toQty = product.locations.get(toLocation) || 0;
-                product.locations.set(fromLocation, fromQty - quantity);
-                product.locations.set(toLocation, toQty + quantity);
-                return true;
-            
-            case 'STOCK_IN':
-                const currentStockInQty = product.locations.get(location) || 0;
-                product.locations.set(location, currentStockInQty + quantity);
-                return true;
-            
-            case 'STOCK_OUT':
-                const currentStockOutQty = product.locations.get(location) || 0;
-                if (currentStockOutQty < quantity) {
-                    showError(`Insufficient stock at ${location}. Only ${currentStockOutQty} available.`, suppressErrors);
-                    return false;
-                }
-                product.locations.set(location, currentStockOutQty - quantity);
-                return true;
-        }
-        return false;
-    };
     
     // --- EVENT HANDLERS (Delegated & Static) ---
 
@@ -284,9 +112,9 @@ document.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
         const email = loginEmailSelect.value;
         const password = document.getElementById('login-password').value;
-        authService.login(email, password);
+        authService.login(email, password, showApp, showError); // Pass UI functions
     });
-    logoutButton.addEventListener('click', authService.logout);
+    logoutButton.addEventListener('click', () => authService.logout(showLogin)); // Pass UI function
 
     // Sidebar Navigation
     navLinks.dashboard.addEventListener('click', (e) => { e.preventDefault(); navigateTo('dashboard'); });
@@ -316,14 +144,12 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         
-        // *** NEW ***
         // Dashboard View All Activity
         if (e.target.closest('#dashboard-view-ledger')) {
             e.preventDefault();
             navigateTo('ledger');
             return;
         }
-        // *** END NEW ***
 
         // Product card click
         const productCard = e.target.closest('.product-card');
@@ -347,7 +173,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // --- FORM HANDLERS ---
+    // --- FORM HANDLERS (UI LOGIC) ---
 
     const handleAddItem = (form) => {
         const itemSku = form.querySelector('#add-product-id').value;
@@ -359,27 +185,19 @@ document.addEventListener('DOMContentLoaded', () => {
             return showError("Please fill out all fields with valid data.");
         }
 
-        // Get 'before' state (which is 0 for a new item)
         const beforeQuantity = 0;
         const afterQuantity = quantity;
+        const user = currentUser; // from core.js
 
-        // Build transaction payload as per SRS
         const transaction = {
-            txType: "CREATE_ITEM",
-            itemSku,
-            itemName,
-            quantity,
-            beforeQuantity,
-            afterQuantity,
-            toLocation,
-            userId: currentUser.id,
-            employeeId: currentUser.employeeId,
-            userName: currentUser.name,
+            txType: "CREATE_ITEM", itemSku, itemName, quantity,
+            beforeQuantity, afterQuantity, toLocation,
+            userId: user.id, employeeId: user.employeeId, userName: user.name,
             timestamp: new Date().toISOString()
         };
 
-        if (processTransaction(transaction)) {
-            addTransactionToChain(transaction);
+        if (processTransaction(transaction, false, showError)) { // from core.js
+            addTransactionToChain(transaction); // from core.js
             renderProductList();
             showSuccess(`Product ${itemName} added!`);
             form.reset();
@@ -395,10 +213,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!itemSku || !quantity || quantity <= 0) return showError("Please enter a valid quantity.");
         
-        const product = inventory.get(itemSku);
+        const product = inventory.get(itemSku); // 'inventory' from core.js
         let transaction = {};
         let success = false;
         let beforeQuantity, afterQuantity;
+        const user = currentUser; // from core.js
 
         switch (actionType) {
             case 'MOVE':
@@ -410,8 +229,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 afterQuantity = { from: beforeQuantity.from - quantity, to: beforeQuantity.to + quantity };
                 
                 transaction = { txType: "MOVE", itemSku, quantity, fromLocation, toLocation, beforeQuantity, afterQuantity,
-                                userId: currentUser.id, employeeId: currentUser.employeeId, userName: currentUser.name, timestamp: new Date().toISOString() };
-                success = processTransaction(transaction);
+                                userId: user.id, employeeId: user.employeeId, userName: user.name, timestamp: new Date().toISOString() };
+                success = processTransaction(transaction, false, showError); // from core.js
                 break;
             
             case 'STOCK_IN':
@@ -420,8 +239,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 afterQuantity = beforeQuantity + quantity;
 
                 transaction = { txType: "STOCK_IN", itemSku, quantity, location: locationIn, beforeQuantity, afterQuantity,
-                                userId: currentUser.id, employeeId: currentUser.employeeId, userName: currentUser.name, timestamp: new Date().toISOString() };
-                success = processTransaction(transaction);
+                                userId: user.id, employeeId: user.employeeId, userName: user.name, timestamp: new Date().toISOString() };
+                success = processTransaction(transaction, false, showError); // from core.js
                 break;
                 
             case 'STOCK_OUT':
@@ -430,13 +249,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 afterQuantity = beforeQuantity - quantity;
                 
                 transaction = { txType: "STOCK_OUT", itemSku, quantity, location: locationOut, beforeQuantity, afterQuantity,
-                                userId: currentUser.id, employeeId: currentUser.employeeId, userName: currentUser.name, timestamp: new Date().toISOString() };
-                success = processTransaction(transaction);
+                                userId: user.id, employeeId: user.employeeId, userName: user.name, timestamp: new Date().toISOString() };
+                success = processTransaction(transaction, false, showError); // from core.js
                 break;
         }
 
         if (success) {
-            addTransactionToChain(transaction);
+            addTransactionToChain(transaction); // from core.js
             renderProductDetail(itemSku); // Re-render this view
             showSuccess(`Stock for ${itemSku} updated!`);
         }
@@ -444,10 +263,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const handleClearDb = () => {
         localStorage.removeItem(DB_KEY);
-        localStorage.removeItem(USERS_KEY); // Also clear user roles
-        inventory.clear();
-        loadBlockchain(); // Re-creates Genesis
-        authService.init(); // Re-inits user db
+        localStorage.removeItem(USERS_KEY);
+        inventory.clear(); // from core.js
+        loadBlockchain(); // from core.js
+        
+        // Re-init auth service (which lives in core.js)
+        // This is a bit of a workaround for the UI functions
+        // We are effectively logging out and back in
+        authService.init(showApp, showLogin);
+        
         navigateTo('dashboard');
         showSuccess("Database cleared and demo reset.");
     };
@@ -462,16 +286,13 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     
     const handleRoleChange = (userId, newRole) => {
-        // Update the 'usersDb' in memory
-        const user = usersDb.find(u => u.id === userId);
+        const user = usersDb.find(u => u.id === userId); // 'usersDb' from core.js
         if (user) {
             user.role = newRole;
-            // Save back to 'localStorage' (simulating DB write)
             localStorage.setItem(USERS_KEY, JSON.stringify(usersDb));
             showSuccess(`Role for ${user.name} updated to ${newRole}.`);
             
-            // If admin changed their own role, re-auth
-            if (user.id === currentUser.id) {
+            if (user.id === currentUser.id) { // 'currentUser' from core.js
                 currentUser.role = newRole;
                 localStorage.setItem(AUTH_KEY, JSON.stringify(currentUser));
                 showApp(); // Re-render UI with new permissions
@@ -479,11 +300,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // --- VIEW RENDERING FUNCTIONS ---
+    // --- VIEW RENDERING FUNCTIONS (UI LOGIC) ---
     
     const renderDashboard = () => {
-        // --- Render KPIs ---
-        let totalSkus = inventory.size;
+        let totalSkus = inventory.size; // 'inventory' from core.js
         let totalUnits = 0;
         inventory.forEach(product => {
             product.locations.forEach(qty => totalUnits += qty);
@@ -491,32 +311,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
         appContent.querySelector('#kpi-total-skus').textContent = totalSkus;
         appContent.querySelector('#kpi-total-units').textContent = totalUnits;
-        appContent.querySelector('#kpi-chain-length').textContent = blockchain.length;
+        appContent.querySelector('#kpi-chain-length').textContent = blockchain.length; // 'blockchain' from core.js
         
-        // --- Render Permissions for DB/Verify ---
         appContent.querySelector('#clear-db-button').style.display = permissionService.can('CLEAR_DB') ? 'flex' : 'none';
         appContent.querySelector('#verify-chain-button').style.display = permissionService.can('VERIFY_CHAIN') ? 'flex' : 'none';
         
-        // --- *** NEW FEATURE LOGIC *** ---
-        // --- Render Recent Activity ---
+        // Render Recent Activity
         const activityList = appContent.querySelector('#recent-activity-list');
         const emptyMessage = appContent.querySelector('#recent-activity-empty');
         const viewLedgerLink = appContent.querySelector('#dashboard-view-ledger');
         const activityContainer = appContent.querySelector('#recent-activity-container');
 
-        if (!activityList) return; // Template not ready
-
-        // Show/hide based on permissions
         if (!permissionService.can('VIEW_LEDGER')) {
             activityContainer.style.display = 'none';
-            return; // Don't render if user can't see ledger
+            return;
         }
         viewLedgerLink.style.display = 'block';
+        activityList.innerHTML = '';
 
-        activityList.innerHTML = ''; // Clear list
-
-        // Get last 5 blocks (reverse, filter genesis, take 5)
-        const recentBlocks = [...blockchain]
+        const recentBlocks = [...blockchain] // 'blockchain' from core.js
             .reverse()
             .filter(block => block.transaction.txType !== 'GENESIS')
             .slice(0, 5);
@@ -529,7 +342,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 activityList.appendChild(createLedgerBlockElement(block));
             });
         }
-        // --- *** END NEW FEATURE LOGIC *** ---
     };
 
     const renderProductList = () => {
@@ -537,10 +349,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!productGrid) return;
         productGrid.innerHTML = ''; 
         
-        // Permissions
         appContent.querySelector('#add-item-container').style.display = permissionService.can('CREATE_ITEM') ? 'block' : 'none';
 
-        if (inventory.size === 0) {
+        if (inventory.size === 0) { // 'inventory' from core.js
             productGrid.innerHTML = `<p class="text-slate-500 lg:col-span-3">No products in inventory. ${permissionService.can('CREATE_ITEM') ? 'Add one above!' : ''}</p>`;
             return;
         }
@@ -570,18 +381,16 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const renderProductDetail = (productId) => {
-        const product = inventory.get(productId);
+        const product = inventory.get(productId); // 'inventory' from core.js
         if (!product) {
             showError(`Product ${productId} not found.`);
             return navigateTo('products');
         }
 
-        // Fill product info
         appContent.querySelector('#detail-product-name').textContent = product.productName;
         appContent.querySelector('#detail-product-id').textContent = productId;
         appContent.querySelector('#update-product-id').value = productId;
 
-        // Fill stock levels
         const stockLevelsDiv = appContent.querySelector('#detail-stock-levels');
         stockLevelsDiv.innerHTML = '';
         let totalStock = 0;
@@ -596,13 +405,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         appContent.querySelector('#detail-total-stock').textContent = `${totalStock} units`;
         
-        // Permissions
         appContent.querySelector('#update-stock-container').style.display = permissionService.can('UPDATE_STOCK') ? 'block' : 'none';
 
-        // Render Item History (The SRS Requirement)
         renderItemHistory(productId);
         
-        // Add event listener for the action type dropdown
         const actionTypeSelect = appContent.querySelector('#update-action-type');
         const fromGroup = appContent.querySelector('#from-location-group');
         const toGroup = appContent.querySelector('#to-location-group');
@@ -633,9 +439,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const historyDisplay = appContent.querySelector('#item-history-display');
         historyDisplay.innerHTML = '';
         
-        const itemHistory = blockchain
+        const itemHistory = blockchain // 'blockchain' from core.js
             .filter(block => block.transaction.itemSku === productId)
-            .reverse(); // Newest first
+            .reverse();
 
         if (itemHistory.length === 0) {
             historyDisplay.innerHTML = '<p class="text-sm text-slate-500">No history found for this item.</p>';
@@ -651,7 +457,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const ledgerDisplay = appContent.querySelector('#full-ledger-display');
         ledgerDisplay.innerHTML = '';
         
-        [...blockchain].reverse().forEach(block => {
+        [...blockchain].reverse().forEach(block => { // 'blockchain' from core.js
             if (block.transaction.txType === 'GENESIS') return;
             ledgerDisplay.appendChild(createLedgerBlockElement(block));
         });
@@ -661,14 +467,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const tableBody = appContent.querySelector('#user-management-table');
         tableBody.innerHTML = '';
         
-        // (Re-read from storage in case it was modified)
         usersDb = JSON.parse(localStorage.getItem(USERS_KEY));
         
         usersDb.forEach(user => {
             const row = document.createElement('tr');
-            
-            // Cannot edit your own role
-            const isCurrentUser = user.id === currentUser.id;
+            const isCurrentUser = user.id === currentUser.id; // 'currentUser' from core.js
             
             row.innerHTML = `
                 <td class="table-cell font-medium">${user.name}</td>
@@ -737,7 +540,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return blockElement;
     };
     
-    // --- TOAST/NOTIFICATION FUNCTIONS ---
+    // --- TOAST/NOTIFICATION FUNCTIONS (UI LOGIC) ---
     
     let errorTimer;
     const showError = (message, suppress = false) => {
@@ -759,43 +562,15 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // --- INITIALIZATION ---
+    
+    // Populate login dropdown (UI logic)
+    MOCK_USERS.forEach(user => { // 'MOCK_USERS' from config.js
+        const option = document.createElement('option');
+        option.value = user.email;
+        option.textContent = `${user.name} (${user.role})`;
+        loginEmailSelect.appendChild(option);
+    });
 
-    const saveBlockchain = () => {
-        try {
-            localStorage.setItem(DB_KEY, JSON.stringify(blockchain));
-        } catch (e) {
-            console.error("Failed to save blockchain:", e);
-            showError("Could not save data. LocalStorage may be full.");
-        }
-    };
-
-    const loadBlockchain = () => {
-        const savedChain = localStorage.getItem(DB_KEY);
-        if (savedChain) {
-            try {
-                blockchain = JSON.parse(savedChain);
-                if (blockchain.length === 0) throw new Error("Empty chain");
-            } catch (e) {
-                console.error("Failed to parse saved blockchain:", e);
-                localStorage.removeItem(DB_KEY);
-                blockchain = [createGenesisBlock()];
-                saveBlockchain();
-            }
-        } else {
-            blockchain = [createGenesisBlock()];
-            saveBlockchain();
-        }
-    };
-
-    const rebuildInventoryState = () => {
-        inventory.clear();
-        for (let i = 1; i < blockchain.length; i++) {
-            if (blockchain[i] && blockchain[i].transaction) {
-                processTransaction(blockchain[i].transaction, true); // Suppress errors on rebuild
-            }
-        }
-    };
-
-    // --- START THE APP ---
-    authService.init();
+    // Start the app by calling the auth service
+    authService.init(showApp, showLogin); // from core.js
 });
