@@ -135,6 +135,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!permissionService.can('UPDATE_STOCK')) return showError("Access Denied.");
             handleUpdateStock(e.target);
         }
+
+        // *** NEW: Handle Move Stock Form ***
+        if (e.target.id === 'move-stock-form') {
+            if (!permissionService.can('UPDATE_STOCK')) return showError("Access Denied.");
+            handleMoveStock(e.target);
+        }
     });
 
     appContent.addEventListener('click', (e) => {
@@ -180,9 +186,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const itemName = form.querySelector('#add-product-name').value;
         const quantity = parseInt(form.querySelector('#add-quantity').value, 10);
         const toLocation = form.querySelector('#add-to').value;
+        // *** MODIFIED: Read price from new field ***
+        const price = parseFloat(form.querySelector('#add-price').value);
 
-        if (!itemSku || !itemName || !quantity || quantity <= 0) {
-            return showError("Please fill out all fields with valid data.");
+        if (!itemSku || !itemName || !quantity || quantity <= 0 || !price || price < 0) {
+            return showError("Please fill out all fields with valid data (Price/Qty > 0).");
         }
 
         const beforeQuantity = 0;
@@ -191,6 +199,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const transaction = {
             txType: "CREATE_ITEM", itemSku, itemName, quantity,
+            price, // *** MODIFIED: Add price to transaction ***
             beforeQuantity, afterQuantity, toLocation,
             userId: user.id, employeeId: user.employeeId, userName: user.name,
             timestamp: new Date().toISOString()
@@ -207,7 +216,8 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const handleUpdateStock = (form) => {
-        const itemSku = form.querySelector('#update-product-id').value;
+        // *** MODIFIED: Find product ID from the *other* form (since it's shared) ***
+        const itemSku = document.getElementById('update-product-id').value;
         const quantity = parseInt(form.querySelector('#update-quantity').value, 10);
         // Get which button was clicked using the event target
         const clickedButton = document.activeElement;
@@ -266,6 +276,50 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    // *** NEW FUNCTION: handleMoveStock ***
+    const handleMoveStock = (form) => {
+        const itemSku = document.getElementById('update-product-id').value; // Get SKU from hidden field
+        const quantity = parseInt(form.querySelector('#move-quantity').value, 10);
+        const fromLocation = form.querySelector('#move-from-location').value;
+        const toLocation = form.querySelector('#move-to-location').value;
+
+        if (fromLocation === toLocation) {
+            return showError("Cannot move stock to the same location.");
+        }
+        if (!itemSku || !quantity || quantity <= 0) {
+            return showError("Please enter a valid quantity.");
+        }
+
+        const product = inventory.get(itemSku);
+        const user = currentUser;
+
+        // Calculate before/after quantities for the ledger
+        const beforeFromQty = product.locations.get(fromLocation) || 0;
+        const beforeToQty = product.locations.get(toLocation) || 0;
+        const afterFromQty = beforeFromQty - quantity;
+        const afterToQty = beforeToQty + quantity;
+
+        const transaction = {
+            txType: "MOVE",
+            itemSku,
+            quantity,
+            fromLocation,
+            toLocation,
+            beforeQuantity: { from: beforeFromQty, to: beforeToQty },
+            afterQuantity: { from: afterFromQty, to: afterToQty },
+            userId: user.id, 
+            employeeId: user.employeeId, 
+            userName: user.name, 
+            timestamp: new Date().toISOString() 
+        };
+
+        if (processTransaction(transaction, false, showError)) { // core.js handles the logic
+            addTransactionToChain(transaction);
+            renderProductDetail(itemSku); // Re-render this view
+            showSuccess(`Moved ${quantity} units of ${itemSku} from ${fromLocation} to ${toLocation}.`);
+        }
+    };
+
     const handleClearDb = () => {
         localStorage.removeItem(DB_KEY);
         localStorage.removeItem(USERS_KEY);
@@ -321,31 +375,33 @@ document.addEventListener('DOMContentLoaded', () => {
         appContent.querySelector('#clear-db-button').style.display = permissionService.can('CLEAR_DB') ? 'flex' : 'none';
         appContent.querySelector('#verify-chain-button').style.display = permissionService.can('VERIFY_CHAIN') ? 'flex' : 'none';
         
-        // Render Recent Activity
-        const activityList = appContent.querySelector('#recent-activity-list');
-        const emptyMessage = appContent.querySelector('#recent-activity-empty');
-        const viewLedgerLink = appContent.querySelector('#dashboard-view-ledger');
+        // Render Recent Activity (Check if elements exist, they might not in this template)
         const activityContainer = appContent.querySelector('#recent-activity-container');
+        if (activityContainer) {
+            const activityList = appContent.querySelector('#recent-activity-list');
+            const emptyMessage = appContent.querySelector('#recent-activity-empty');
+            const viewLedgerLink = appContent.querySelector('#dashboard-view-ledger');
 
-        if (!permissionService.can('VIEW_LEDGER')) {
-            activityContainer.style.display = 'none';
-            return;
-        }
-        viewLedgerLink.style.display = 'block';
-        activityList.innerHTML = '';
+            if (!permissionService.can('VIEW_LEDGER')) {
+                activityContainer.style.display = 'none';
+                return;
+            }
+            viewLedgerLink.style.display = 'block';
+            activityList.innerHTML = '';
 
-        const recentBlocks = [...blockchain] // 'blockchain' from core.js
-            .reverse()
-            .filter(block => block.transaction.txType !== 'GENESIS')
-            .slice(0, 5);
+            const recentBlocks = [...blockchain] // 'blockchain' from core.js
+                .reverse()
+                .filter(block => block.transaction.txType !== 'GENESIS')
+                .slice(0, 5);
 
-        if (recentBlocks.length === 0) {
-            emptyMessage.style.display = 'block';
-        } else {
-            emptyMessage.style.display = 'none';
-            recentBlocks.forEach(block => {
-                activityList.appendChild(createLedgerBlockElement(block));
-            });
+            if (recentBlocks.length === 0) {
+                emptyMessage.style.display = 'block';
+            } else {
+                emptyMessage.style.display = 'none';
+                recentBlocks.forEach(block => {
+                    activityList.appendChild(createLedgerBlockElement(block));
+                });
+            }
         }
     };
 
@@ -394,7 +450,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         appContent.querySelector('#detail-product-name').textContent = product.productName;
         appContent.querySelector('#detail-product-id').textContent = productId;
-        appContent.querySelector('#update-product-id').value = productId;
+        appContent.querySelector('#update-product-id').value = productId; // Set hidden SKU field
+
+        // *** MODIFIED: Display price ***
+        const price = product.price || 0;
+        appContent.querySelector('#detail-product-price').textContent = `$${price.toFixed(2)}`;
+
 
         const stockLevelsDiv = appContent.querySelector('#detail-stock-levels');
         stockLevelsDiv.innerHTML = '';
@@ -414,30 +475,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         renderItemHistory(productId);
         
-        const actionTypeSelect = appContent.querySelector('#update-action-type');
-        const fromGroup = appContent.querySelector('#from-location-group');
-        const toGroup = appContent.querySelector('#to-location-group');
-        const fromLabel = fromGroup.querySelector('label');
-        const toLabel = toGroup.querySelector('label');
-
-        const handleActionChange = () => {
-            switch (actionTypeSelect.value) {
-                case 'MOVE':
-                    fromGroup.style.display = 'block'; toGroup.style.display = 'block';
-                    fromLabel.textContent = 'From Location'; toLabel.textContent = 'To Location';
-                    break;
-                case 'STOCK_IN':
-                    fromGroup.style.display = 'none'; toGroup.style.display = 'block';
-                    toLabel.textContent = 'Location';
-                    break;
-                case 'STOCK_OUT':
-                    fromGroup.style.display = 'block'; toGroup.style.display = 'none';
-                    fromLabel.textContent = 'Location';
-                    break;
-            }
-        };
-        actionTypeSelect.addEventListener('change', handleActionChange);
-        handleActionChange();
+        // *** MODIFIED: Removed dead code that was here ***
     };
 
     const renderItemHistory = (productId) => {
@@ -501,14 +539,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const blockElement = document.createElement('div');
         blockElement.className = 'border border-slate-200 rounded-lg p-3 bg-white shadow-sm';
         
-        const { txType, itemSku, itemName, quantity, fromLocation, toLocation, location, userName, employeeId, beforeQuantity, afterQuantity } = block.transaction;
+        // *** MODIFIED: Destructure 'price' ***
+        const { txType, itemSku, itemName, quantity, fromLocation, toLocation, location, userName, employeeId, beforeQuantity, afterQuantity, price } = block.transaction;
         let transactionHtml = '';
         let detailsHtml = '';
 
         switch (txType) {
             case 'CREATE_ITEM':
                 transactionHtml = `<span class="font-semibold text-green-700">CREATE</span> <strong>${quantity}</strong> of <strong>${itemName}</strong> (${itemSku}) to <strong>${toLocation}</strong>`;
-                detailsHtml = `<li>User: <strong>${userName}</strong> (${employeeId})</li>`;
+                // *** MODIFIED: Add price to details ***
+                detailsHtml = `<li>User: <strong>${userName}</strong> (${employeeId})</li>
+                               <li>Price: <strong>$${(price || 0).toFixed(2)}</strong></li>`;
                 break;
             case 'MOVE':
                 transactionHtml = `<span class="font-semibold text-blue-600">MOVE</span> <strong>${quantity}</strong> of <strong>${itemSku}</strong>`;

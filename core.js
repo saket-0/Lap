@@ -95,7 +95,8 @@ const addTransactionToChain = (transaction) => {
 };
 
 const processTransaction = (transaction, suppressErrors = false, showErrorCallback) => {
-    const { txType, itemSku, itemName, quantity, fromLocation, toLocation, location } = transaction;
+    // *** MODIFIED: Added 'price' ***
+    const { txType, itemSku, itemName, quantity, fromLocation, toLocation, location, price } = transaction;
 
     let product;
     if (txType !== 'CREATE_ITEM' && !inventory.has(itemSku)) {
@@ -116,6 +117,7 @@ const processTransaction = (transaction, suppressErrors = false, showErrorCallba
             if (!inventory.has(itemSku)) {
                  inventory.set(itemSku, {
                     productName: itemName,
+                    price: price || 0, // *** ADDED: Store the price ***
                     locations: new Map()
                 });
             }
@@ -129,6 +131,11 @@ const processTransaction = (transaction, suppressErrors = false, showErrorCallba
             if (fromQty < quantity) {
                 if (showErrorCallback) showErrorCallback(`Insufficient stock at ${fromLocation}. Only ${fromQty} available.`, suppressErrors);
                 return false;
+            }
+            // Check for self-transfer
+            if (fromLocation === toLocation) {
+                 if (showErrorCallback) showErrorCallback(`Cannot move item to its current location.`, suppressErrors);
+                 return false;
             }
             const toQty = product.locations.get(toLocation) || 0;
             product.locations.set(fromLocation, fromQty - quantity);
