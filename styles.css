@@ -1,0 +1,40 @@
+/* Custom styles for the Inter font */
+body {
+    font-family: 'Inter', sans-serif;
+}
+
+/* Custom scrollbar for the ledger */
+#ledger-display::-webkit-scrollbar,
+#inventory-display::-webkit-scrollbar {
+    width: 6px;
+}
+#ledger-display::-webkit-scrollbar-track,
+#inventory-display::-webkit-scrollbar-track {
+    background: #f1f5f9; /* slate-100 */
+}
+#ledger-display::-webkit-scrollbar-thumb,
+#inventory-display::-webkit-scrollbar-thumb {
+    background: #94a3b8; /* slate-400 */
+    border-radius: 3px;
+}
+#ledger-display::-webkit-scrollbar-thumb:hover,
+#inventory-display::-webkit-scrollbar-thumb:hover {
+    background: #64748b; /* slate-500 */
+}
+
+/* Toast message styles */
+.toast-message {
+    position: fixed;
+    bottom: 2rem; /* 32px */
+    right: 2rem; /* 32px */
+    color: white;
+    padding: 0.75rem 1.5rem; /* 12px 24px */
+    border-radius: 0.5rem; /* 8px */
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    transform: translateX(200%);
+    transition: transform 300ms ease-out;
+}
+
+.toast-show {
+    transform: translateX(0);
+}
