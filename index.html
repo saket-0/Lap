@@ -4,20 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BIMS - Blockchain Inventory Management</title>
-    <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Load Inter font -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <!-- Load Custom Stylesheet -->
     <link rel="stylesheet" href="style.css">
-    <!-- Load Phosphor Icons -->
     <script src="https://unpkg.com/@phosphor-icons/web@2.0.3"></script>
 </head>
 <body class="bg-slate-100 text-slate-900">
 
-    <!-- Login Overlay -->
     <div id="login-overlay" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900 bg-opacity-75 backdrop-blur-sm">
         <div class="bg-white p-8 rounded-lg shadow-2xl w-full max-w-sm">
             <h2 class="text-3xl font-bold text-center text-indigo-600 mb-6">BIMS Login</h2>
@@ -26,8 +21,7 @@
                 <div>
                     <label for="login-email" class="block text-sm font-medium text-slate-700">Email (Select User)</label>
                     <select id="login-email" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" required>
-                        <!-- Options will be populated by app.js -->
-                    </select>
+                        </select>
                 </div>
                 <div>
                     <label for="login-password" class="block text-sm font-medium text-slate-700">Password</label>
@@ -41,16 +35,13 @@
         </div>
     </div>
 
-    <!-- Main Application Wrapper (Hidden by default) -->
     <div id="app-wrapper" class="flex h-screen hidden">
-        <!-- Sidebar Navigation -->
         <nav class="w-64 bg-white shadow-lg flex flex-col">
             <div class="p-4 border-b border-slate-200">
                 <h1 class="text-2xl font-bold text-indigo-600">BIMS</h1>
                 <p class="text-sm text-slate-500">Inventory Management</p>
             </div>
             
-            <!-- User Profile Section -->
             <div class="p-4 border-b border-slate-200">
                 <h3 id="user-name" class="font-semibold text-slate-800"></h3>
                 <p id="user-role" class="text-sm text-indigo-600 font-medium"></p>
@@ -60,7 +51,6 @@
                 </button>
             </div>
 
-            <!-- Navigation Links -->
             <ul class="flex-1 p-2 space-y-1">
                 <li>
                     <a href="#" id="nav-dashboard" class="nav-link">
@@ -85,36 +75,25 @@
             </ul>
         </nav>
 
-        <!-- Main Content Area -->
         <main class="flex-1 bg-slate-100 overflow-y-auto">
             <div id="app-content" class="p-4 md:p-8">
-                <!-- App views (Dashboard, Product List, etc.) will be rendered here -->
-            </div>
+                </div>
         </main>
     </div>
 
-    <!-- Error Toast -->
     <div id="error-toast" class="toast-message bg-red-600">
         <span id="error-message"></span>
     </div>
     
-    <!-- Success Toast -->
     <div id="success-toast" class="toast-message bg-green-600">
         <span id="success-message"></span>
     </div>
 
 
-    <!-- 
-      TEMPLATES 
-      These are hidden by default and cloned by app.js to render views
-    -->
-
-    <!-- Template for the Dashboard View -->
     <template id="dashboard-view-template">
         <div class="space-y-8">
             <h1 class="text-4xl font-bold text-slate-800">Dashboard</h1>
             
-            <!-- KPI Cards -->
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div class="bg-white p-6 rounded-lg shadow-md">
                     <h3 class="text-sm font-medium text-slate-500 uppercase">Total SKUs</h3>
@@ -130,7 +109,6 @@
                 </div>
             </div>
 
-            <!-- Database & Verification -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div class="bg-white p-6 rounded-lg shadow-md">
                     <h2 class="text-2xl font-semibold mb-4 text-slate-800">Database Options</h2>
@@ -149,13 +127,21 @@
                     </button>
                 </div>
             </div>
-        </div>
+
+            <div id="recent-activity-container" class="bg-white p-6 rounded-lg shadow-md">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-2xl font-semibold text-slate-800">Recent Activity</h2>
+                    <a href="#" id="dashboard-view-ledger" class="text-sm font-medium text-indigo-600 hover:text-indigo-800">View All</a>
+                </div>
+                <p id="recent-activity-empty" class="text-sm text-slate-500 mb-4">No transactions have been recorded yet.</p>
+                <div id="recent-activity-list" class="space-y-4 max-h-[400px] overflow-y-auto pr-2">
+                    </div>
+            </div>
+            </div>
     </template>
 
-    <!-- Template for the Product List View -->
     <template id="product-list-view-template">
         <div class="space-y-8">
-            <!-- Add Item Form (Admin Only) -->
             <div id="add-item-container" class="bg-white p-6 rounded-lg shadow-md">
                 <h2 class="text-2xl font-semibold mb-4 text-slate-800">Add New Product Type</h2>
                 <p class="text-sm text-slate-500 mb-4">Add a new product (SKU) to the inventory system. Initial stock will be added to the 'Supplier'.</p>
@@ -190,21 +176,17 @@
                 </form>
             </div>
 
-            <!-- Product Grid -->
             <div>
                 <h2 class="text-3xl font-semibold mb-4 text-slate-800">Product Inventory</h2>
                 <div id="product-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <!-- Product cards will be rendered here by JS -->
-                </div>
+                    </div>
             </div>
         </div>
     </template>
 
 
-    <!-- Template for the Product Detail View -->
     <template id="product-detail-view-template">
         <div class="space-y-8">
-            <!-- Back Button -->
             <div>
                 <button id="back-to-list-button" class="inline-flex items-center gap-2 text-sm font-medium text-indigo-600 hover:text-indigo-800">
                     <i class="ph-bold ph-arrow-left"></i>
@@ -213,24 +195,19 @@
             </div>
         
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <!-- Left Column: Product Info & Stock Update -->
                 <div class="lg:col-span-2 space-y-8">
-                    <!-- Product Header -->
                     <div class="bg-white p-6 rounded-lg shadow-md">
                         <div class="flex flex-col md:flex-row gap-6">
-                            <!-- Placeholder Image -->
                             <div class="w-full md:w-1/3 h-48 bg-slate-200 rounded-lg flex items-center justify-center">
                                 <i class="ph-bold ph-package text-slate-400 text-6xl"></i>
                             </div>
-                            <!-- Product Info -->
                             <div class="w-full md:w-2/3">
                                 <h2 id="detail-product-name" class="text-4xl font-bold text-slate-900">Product Name</h2>
                                 <p id="detail-product-id" class="text-sm text-slate-500 mt-1">SKU-000</p>
                                 <hr class="my-4">
                                 <h3 class="text-lg font-semibold text-slate-800 mb-2">Current Stock Levels</h3>
                                 <div id="detail-stock-levels" class="space-y-2">
-                                    <!-- Stock levels rendered by JS -->
-                                </div>
+                                    </div>
                                 <hr class="my-4">
                                 <div class="flex justify-between items-center">
                                     <span class="text-lg font-semibold text-slate-800">Total Stock:</span>
@@ -240,7 +217,6 @@
                         </div>
                     </div>
 
-                    <!-- Update Stock Form (Manager/Admin Only) -->
                     <div id="update-stock-container" class="bg-white p-6 rounded-lg shadow-md">
                         <h2 class="text-2xl font-semibold mb-4 text-slate-800">Update Stock</h2>
                         <p class="text-sm text-slate-500 mb-4">Move, add (Stock In), or remove (Stock Out) items for this product.</p>
@@ -283,34 +259,29 @@
                     </div>
                 </div>
 
-                <!-- Right Column: Item History (Auditor feature) -->
                 <div class="lg:col-span-1">
                     <div class="bg-white p-6 rounded-lg shadow-md sticky top-8">
                         <h2 class="text-2xl font-semibold mb-4 text-slate-800">Item History</h2>
                         <p class="text-sm text-slate-500 mb-4">Immutable transaction log for this item.</p>
                         <div id="item-history-display" class="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
-                            <!-- Item history will be rendered here by JS -->
-                        </div>
+                            </div>
                     </div>
                 </div>
             </div>
         </div>
     </template>
 
-    <!-- Template for the Full Ledger View -->
     <template id="ledger-view-template">
         <div class="space-y-8">
             <h1 class="text-4xl font-bold text-slate-800">Full Blockchain Ledger</h1>
             <p class="text-lg text-slate-600">The immutable history of all transactions across all products. (Newest block on top).</p>
             <div class="bg-white p-6 rounded-lg shadow-md">
                 <div id="full-ledger-display" class="space-y-4 max-h-[80vh] overflow-y-auto pr-2">
-                    <!-- Full ledger will be rendered here by JS -->
-                </div>
+                    </div>
             </div>
         </div>
     </template>
 
-    <!-- Template for the Admin View -->
     <template id="admin-view-template">
         <div class="space-y-8">
             <h1 class="text-4xl font-bold text-slate-800">Admin Panel</h1>
@@ -328,8 +299,7 @@
                             </tr>
                         </thead>
                         <tbody id="user-management-table" class="bg-white divide-y divide-slate-200">
-                            <!-- User rows will be rendered here by JS -->
-                        </tbody>
+                            </tbody>
                     </table>
                 </div>
             </div>
@@ -337,9 +307,7 @@
     </template>
 
 
-    <!-- Load Scripts -->
     <script src="blockchain.js"></script>
     <script src="app.js" defer></script>
 </body>
 </html>
-

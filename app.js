@@ -315,6 +315,16 @@ document.addEventListener('DOMContentLoaded', () => {
             navigateTo('products');
             return;
         }
+        
+        // *** NEW ***
+        // Dashboard View All Activity
+        if (e.target.closest('#dashboard-view-ledger')) {
+            e.preventDefault();
+            navigateTo('ledger');
+            return;
+        }
+        // *** END NEW ***
+
         // Product card click
         const productCard = e.target.closest('.product-card');
         if (productCard && productCard.dataset.productId) {
@@ -472,6 +482,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- VIEW RENDERING FUNCTIONS ---
     
     const renderDashboard = () => {
+        // --- Render KPIs ---
         let totalSkus = inventory.size;
         let totalUnits = 0;
         inventory.forEach(product => {
@@ -482,9 +493,43 @@ document.addEventListener('DOMContentLoaded', () => {
         appContent.querySelector('#kpi-total-units').textContent = totalUnits;
         appContent.querySelector('#kpi-chain-length').textContent = blockchain.length;
         
-        // Permissions
+        // --- Render Permissions for DB/Verify ---
         appContent.querySelector('#clear-db-button').style.display = permissionService.can('CLEAR_DB') ? 'flex' : 'none';
         appContent.querySelector('#verify-chain-button').style.display = permissionService.can('VERIFY_CHAIN') ? 'flex' : 'none';
+        
+        // --- *** NEW FEATURE LOGIC *** ---
+        // --- Render Recent Activity ---
+        const activityList = appContent.querySelector('#recent-activity-list');
+        const emptyMessage = appContent.querySelector('#recent-activity-empty');
+        const viewLedgerLink = appContent.querySelector('#dashboard-view-ledger');
+        const activityContainer = appContent.querySelector('#recent-activity-container');
+
+        if (!activityList) return; // Template not ready
+
+        // Show/hide based on permissions
+        if (!permissionService.can('VIEW_LEDGER')) {
+            activityContainer.style.display = 'none';
+            return; // Don't render if user can't see ledger
+        }
+        viewLedgerLink.style.display = 'block';
+
+        activityList.innerHTML = ''; // Clear list
+
+        // Get last 5 blocks (reverse, filter genesis, take 5)
+        const recentBlocks = [...blockchain]
+            .reverse()
+            .filter(block => block.transaction.txType !== 'GENESIS')
+            .slice(0, 5);
+
+        if (recentBlocks.length === 0) {
+            emptyMessage.style.display = 'block';
+        } else {
+            emptyMessage.style.display = 'none';
+            recentBlocks.forEach(block => {
+                activityList.appendChild(createLedgerBlockElement(block));
+            });
+        }
+        // --- *** END NEW FEATURE LOGIC *** ---
     };
 
     const renderProductList = () => {
@@ -754,4 +799,3 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- START THE APP ---
     authService.init();
 });
-

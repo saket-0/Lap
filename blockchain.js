@@ -83,4 +83,3 @@ function isChainValid(blockchainArray) {
     // If all blocks pass, the chain is valid
     return true;
 }
-
