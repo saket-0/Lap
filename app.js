@@ -209,7 +209,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const handleUpdateStock = (form) => {
         const itemSku = form.querySelector('#update-product-id').value;
         const quantity = parseInt(form.querySelector('#update-quantity').value, 10);
-        const actionType = form.querySelector('#update-action-type').value;
+        // Get which button was clicked using the event target
+        const clickedButton = document.activeElement;
+        const actionType = clickedButton.id === 'stock-in-button' ? 'STOCK_IN' : 'STOCK_OUT';
 
         if (!itemSku || !quantity || quantity <= 0) return showError("Please enter a valid quantity.");
         
@@ -219,39 +221,42 @@ document.addEventListener('DOMContentLoaded', () => {
         let beforeQuantity, afterQuantity;
         const user = currentUser; // from core.js
 
-        switch (actionType) {
-            case 'MOVE':
-                const fromLocation = form.querySelector('#update-from').value;
-                const toLocation = form.querySelector('#update-to').value;
-                if (fromLocation === toLocation) return showError("'From' and 'To' locations cannot be the same.");
+        if (actionType === 'STOCK_IN') {
+            const locationIn = form.querySelector('#update-location').value;
+            beforeQuantity = product.locations.get(locationIn) || 0;
+            afterQuantity = beforeQuantity + quantity;
 
-                beforeQuantity = { from: product.locations.get(fromLocation) || 0, to: product.locations.get(toLocation) || 0 };
-                afterQuantity = { from: beforeQuantity.from - quantity, to: beforeQuantity.to + quantity };
-                
-                transaction = { txType: "MOVE", itemSku, quantity, fromLocation, toLocation, beforeQuantity, afterQuantity,
-                                userId: user.id, employeeId: user.employeeId, userName: user.name, timestamp: new Date().toISOString() };
-                success = processTransaction(transaction, false, showError); // from core.js
-                break;
+            transaction = { 
+                txType: "STOCK_IN", 
+                itemSku, 
+                quantity, 
+                location: locationIn, 
+                beforeQuantity, 
+                afterQuantity,
+                userId: user.id, 
+                employeeId: user.employeeId, 
+                userName: user.name, 
+                timestamp: new Date().toISOString() 
+            };
+            success = processTransaction(transaction, false, showError); // from core.js
+        } else if (actionType === 'STOCK_OUT') {
+            const locationOut = form.querySelector('#update-location').value;
+            beforeQuantity = product.locations.get(locationOut) || 0;
+            afterQuantity = beforeQuantity - quantity;
             
-            case 'STOCK_IN':
-                const locationIn = form.querySelector('#update-to').value;
-                beforeQuantity = product.locations.get(locationIn) || 0;
-                afterQuantity = beforeQuantity + quantity;
-
-                transaction = { txType: "STOCK_IN", itemSku, quantity, location: locationIn, beforeQuantity, afterQuantity,
-                                userId: user.id, employeeId: user.employeeId, userName: user.name, timestamp: new Date().toISOString() };
-                success = processTransaction(transaction, false, showError); // from core.js
-                break;
-                
-            case 'STOCK_OUT':
-                const locationOut = form.querySelector('#update-from').value;
-                beforeQuantity = product.locations.get(locationOut) || 0;
-                afterQuantity = beforeQuantity - quantity;
-                
-                transaction = { txType: "STOCK_OUT", itemSku, quantity, location: locationOut, beforeQuantity, afterQuantity,
-                                userId: user.id, employeeId: user.employeeId, userName: user.name, timestamp: new Date().toISOString() };
-                success = processTransaction(transaction, false, showError); // from core.js
-                break;
+            transaction = { 
+                txType: "STOCK_OUT", 
+                itemSku, 
+                quantity, 
+                location: locationOut, 
+                beforeQuantity, 
+                afterQuantity,
+                userId: user.id, 
+                employeeId: user.employeeId, 
+                userName: user.name, 
+                timestamp: new Date().toISOString() 
+            };
+            success = processTransaction(transaction, false, showError); // from core.js
         }
 
         if (success) {
