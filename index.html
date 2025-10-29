@@ -21,7 +21,11 @@
                 <div>
                     <label for="login-email" class="block text-sm font-medium text-slate-700">Email (Select User)</label>
                     <select id="login-email" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" required>
-                    </select>
+                        </select>
+                </div>
+                <div>
+                    <label for="login-password" class="block text-sm font-medium text-slate-700">Password</label>
+                    <input type="password" id="login-password" value="password" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" required>
                     <p class="text-xs text-slate-500 mt-1">Use "password" for any mock user.</p>
                 </div>
                 <button type="submit" class="w-full bg-indigo-600 text-white py-2 px-4 rounded-md shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
@@ -105,6 +109,15 @@
                 </div>
             </div>
 
+            <div id="recent-activity-container" class="bg-white p-6 rounded-lg shadow-md">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-2xl font-semibold text-slate-800">Recent Activity</h2>
+                    <a href="#" id="dashboard-view-ledger" class="text-sm font-medium text-indigo-600 hover:text-indigo-800">View Full Ledger &rarr;</a>
+                </div>
+                <div id="recent-activity-list" class="space-y-4 max-h-96 overflow-y-auto pr-2">
+                    </div>
+                <p id="recent-activity-empty" class="text-sm text-slate-500" style="display: none;">No transactions found.</p>
+            </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div class="bg-white p-6 rounded-lg shadow-md">
                     <h2 class="text-2xl font-semibold mb-4 text-slate-800">Database Options</h2>
@@ -163,7 +176,7 @@
                         Add Product
                     </button>
                 </form>
-                </div>
+            </div>
 
             <div>
                 <h2 class="text-3xl font-semibold mb-4 text-slate-800">Product Inventory</h2>
