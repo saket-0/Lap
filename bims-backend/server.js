@@ -97,38 +97,9 @@ app.post('/api/auth/logout', (req, res) => {
     });
 });
 
-//===============================================================================================
-//===============================================================================================
-
-// // GET /api/users (For Admin Panel)
-// app.get('/api/users', async (req, res) => {
-//     // Simple permission check
-//     if (req.session.user.role !== 'Admin') {
-//         return res.status(403).json({ message: 'Forbidden' });
-//     }
-//     try {
-//         // Select all users but exclude the password hash
-//         const result = await pool.query('SELECT id, employee_id, name, email, role FROM users');
-//         res.status(200).json(result.rows);
-//     } catch (e) {
-//         res.status(500).json({ message: e.message });
-//     }
-// });
-
-// GET /api/users (For Admin Panel)
+// GET /api/users (For Admin Panel & Login Dropdown)
 app.get('/api/users', async (req, res) => {
-    // Simple permission check
-    
-    // DEBUG FIX: Removed this check.
-    // It was causing a TypeError crash when called by the unauthenticated
-    // login page (for the "Quick Login" dropdown), as req.session.user was undefined.
-    // Removing it makes the endpoint public, fixing both the Quick Login
-    // dropdown and the Admin Panel data load.
-    
-    // if (req.session.user.role !== 'Admin') {
-    //     return res.status(403).json({ message: 'Forbidden' });
-    // }
-    
+    // This endpoint is intentionally public to populate the login dropdown.
     try {
         // Select all users but exclude the password hash
         const result = await pool.query('SELECT id, employee_id, name, email, role FROM users');
@@ -137,9 +108,6 @@ app.get('/api/users', async (req, res) => {
         res.status(500).json({ message: e.message });
     }
 });
-
-//===============================================================================================
-//===============================================================================================
 
 // PUT /api/users/:id/role (For Admin Panel)
 app.put('/api/users/:id/role', isAuthenticated, async (req, res) => {
@@ -150,8 +118,8 @@ app.put('/api/users/:id/role', isAuthenticated, async (req, res) => {
     const { id } = req.params;
     const { role } = req.body;
 
-    // Prevent admin from demoting themselves
-    if (id === req.session.user.id) {
+    // *** FIX 1: Correctly compare string param 'id' with number session 'id' ***
+    if (String(id) === String(req.session.user.id)) {
         return res.status(400).json({ message: 'Cannot change your own role' });
     }
 
@@ -170,6 +138,41 @@ app.put('/api/users/:id/role', isAuthenticated, async (req, res) => {
         res.status(500).json({ message: e.message });
     }
 });
+
+// *** FEATURE: POST /api/users (For Admin Panel - Add User) ***
+app.post('/api/users', isAuthenticated, async (req, res) => {
+    if (req.session.user.role !== 'Admin') {
+        return res.status(403).json({ message: 'Forbidden' });
+    }
+
+    const { name, email, employeeId, role, password } = req.body;
+
+    if (!name || !email || !employeeId || !role || !password) {
+        return res.status(400).json({ message: 'All fields are required' });
+    }
+
+    try {
+        // Hash the password
+        const salt = await bcrypt.genSalt(10);
+        const passwordHash = await bcrypt.hash(password, salt);
+
+        const result = await pool.query(
+            `INSERT INTO users (employee_id, name, email, role, password_hash)
+             VALUES ($1, $2, $3, $4, $5)
+             RETURNING id, employee_id, name, email, role`,
+            [employeeId, name, email, role, passwordHash]
+        );
+        
+        res.status(201).json({ message: 'User created', user: result.rows[0] });
+    
+    } catch (e) {
+        if (e.code === '23505') { // unique_violation (e.g., email already exists)
+            return res.status(409).json({ message: 'Email or Employee ID already exists' });
+        }
+        res.status(500).json({ message: e.message });
+    }
+});
+
 
 // --- 5. Start Server ---
 app.listen(port, () => {

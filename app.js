@@ -134,6 +134,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     navLinks.ledger.addEventListener('click', (e) => { e.preventDefault(); navigateTo('ledger'); });
 
     // (All other event listeners are unchanged)
+    // *** MODIFIED: Added 'add-user-form' to the submit listener ***
     appContent.addEventListener('submit', async (e) => {
         e.preventDefault();
         
@@ -151,6 +152,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (!permissionService.can('UPDATE_STOCK')) return showError("Access Denied.");
             await handleMoveStock(e.target);
         }
+
+        // *** FIX 2: Added listener for the new Add User form ***
+        if (e.target.id === 'add-user-form') {
+            if (!permissionService.can('MANAGE_USERS')) return showError("Access Denied.");
+            await handleAddUser(e.target);
+        }
     });
 
     appContent.addEventListener('input', (e) => {
@@ -159,6 +166,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
+    // *** MODIFIED: Role change logic removed from 'click' listener ***
     appContent.addEventListener('click', async (e) => {
         if (e.target.closest('#back-to-list-button')) {
             navigateTo('products');
@@ -192,14 +200,20 @@ document.addEventListener('DOMContentLoaded', async () => {
             await handleVerifyChain();
         }
         
+        // *** BUG FIX: This logic was removed from here. ***
+    });
+
+    // *** FIX 1: Added a 'change' listener to correctly handle the role <select> dropdown ***
+    appContent.addEventListener('change', async (e) => {
         if (e.target.classList.contains('role-select')) {
             if (!permissionService.can('MANAGE_USERS')) return showError("Access Denied.");
             await handleRoleChange(e.target.dataset.userId, e.target.value);
         }
     });
 
+
     // --- FORM HANDLERS (UI LOGIC) ---
-    // (handleAddItem, handleUpdateStock, handleMoveStock, handleClearDb, handleVerifyChain, handleRoleChange are all unchanged)
+    // (handleAddItem, handleUpdateStock, handleMoveStock, handleClearDb, handleVerifyChain are all unchanged)
 
     const handleAddItem = async (form) => {
         const itemSku = form.querySelector('#add-product-id').value;
@@ -373,15 +387,48 @@ document.addEventListener('DOMContentLoaded', async () => {
                 throw new Error(data.message || 'Failed to update role');
             }
             showSuccess(`Role for ${data.user.name} updated to ${newRole}.`);
-            if (data.user.id === currentUser.id) {
+            
+            // If admin changes their own role (which is blocked by server, but good to check)
+            if (data.user.id === currentUser.id) { 
                 currentUser = data.user;
-                await showApp();
+                await showApp(); // Re-render app to hide/show nav links
             }
         } catch (error) {
             showError(error.message);
-            renderAdminPanel();
+            renderAdminPanel(); // On error, re-render to reset the dropdown
         }
     };
+
+    // *** NEW: Handler for the Add User form ***
+    const handleAddUser = async (form) => {
+        const name = form.querySelector('#add-user-name').value;
+        const email = form.querySelector('#add-user-email').value;
+        const employeeId = form.querySelector('#add-user-employee-id').value;
+        const role = form.querySelector('#add-user-role').value;
+        const password = form.querySelector('#add-user-password').value;
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/users`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ name, email, employeeId, role, password })
+            });
+            
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.message || 'Failed to create user');
+            }
+            
+            showSuccess(`User ${data.user.name} created successfully!`);
+            form.reset();
+            renderAdminPanel(); // Refresh the user list
+            
+        } catch (error) {
+            showError(error.message);
+        }
+    };
+
 
     // --- VIEW RENDERING FUNCTIONS (UI LOGIC) ---
     // (renderDashboard, renderProductList, renderProductDetail, renderItemHistory, renderFullLedger, createLedgerBlockElement are unchanged)
@@ -599,47 +646,46 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     const renderAdminPanel = async () => {
         const tableBody = appContent.querySelector('#user-management-table');
+        if (!tableBody) return; // In case view is changed quickly
+        
         tableBody.innerHTML = '<tr><td colspan="4" class="table-cell text-center">Loading users...</td></tr>';
-        let usersDb = [];
+        
         try {
             const response = await fetch(`${API_BASE_URL}/api/users`, {
                 credentials: 'include'
             });
+            
             if (!response.ok) {
-                throw new Error('Failed to fetch users');
+                const err = await response.json();
+                throw new Error(err.message || 'Failed to fetch users');
             }
-            // Map DB fields to frontend expected fields
-            const dbUsers = await response.json();
-            usersDb = dbUsers.map(user => ({
-                id: user.id,
-                employeeId: user.employee_id, // map DB field to frontend
-                name: user.name,
-                email: user.email,
-                role: user.role
-            }));
+            
+            const usersDb = await response.json();
+            tableBody.innerHTML = '';
+
+            usersDb.forEach(user => {
+                const row = document.createElement('tr');
+                const isCurrentUser = user.id === currentUser.id;
+                
+                row.innerHTML = `
+                    <td class="table-cell font-medium">${user.name}</td>
+                    <td class="table-cell text-slate-500">${user.employeeId}</td>
+                    <td class="table-cell text-slate-500">${user.email}</td>
+                    <td class="table-cell">
+                        <select data-user-id="${user.id}" class="role-select block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" ${isCurrentUser ? 'disabled' : ''}>
+                            <option value="Admin" ${user.role === 'Admin' ? 'selected' : ''}>Admin</option>
+                            <option value="Inventory Manager" ${user.role === 'Inventory Manager' ? 'selected' : ''}>Inventory Manager</option>
+                            <option value="Auditor" ${user.role === 'Auditor' ? 'selected' : ''}>Auditor</option>
+                        </select>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+
         } catch (error) {
-            showError('Error loading users and no fallback available.');
+            showError(error.message);
             tableBody.innerHTML = `<tr><td colspan="4" class="table-cell text-center text-red-600">Error loading users.</td></tr>`;
-            return;
         }
-        tableBody.innerHTML = '';
-        usersDb.forEach(user => {
-            const row = document.createElement('tr');
-            const isCurrentUser = user.id === currentUser.id;
-            row.innerHTML = `
-                <td class="table-cell font-medium">${user.name}</td>
-                <td class="table-cell text-slate-500">${user.employeeId}</td>
-                <td class="table-cell text-slate-500">${user.email}</td>
-                <td class="table-cell">
-                    <select data-user-id="${user.id}" class="role-select block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" ${isCurrentUser ? 'disabled' : ''}>
-                        <option value="Admin" ${user.role === 'Admin' ? 'selected' : ''}>Admin</option>
-                        <option value="Inventory Manager" ${user.role === 'Inventory Manager' ? 'selected' : ''}>Inventory Manager</option>
-                        <option value="Auditor" ${user.role === 'Auditor' ? 'selected' : ''}>Auditor</option>
-                    </select>
-                </td>
-            `;
-            tableBody.appendChild(row);
-        });
     };
 
     const createLedgerBlockElement = (block) => {
@@ -719,28 +765,32 @@ document.addEventListener('DOMContentLoaded', async () => {
      */
     const populateLoginDropdown = async () => {
         try {
+            // Note: This endpoint must be public on the server for this to work.
             const response = await fetch(`${API_BASE_URL}/api/users`);
             if (!response.ok) {
                 const err = await response.json();
-                if (err.message === 'Not authenticated') {
-                    throw new Error('Failed to fetch users. (Hint: Make GET /api/users public on server.js)');
-                }
                 throw new Error(err.message || 'Failed to fetch users');
             }
+            
             const users = await response.json();
-            loginEmailSelect.innerHTML = '';
+            
+            loginEmailSelect.innerHTML = ''; // Clear select
+            
             users.forEach((user, index) => {
                 const option = document.createElement('option');
                 option.value = user.email;
                 option.textContent = `${user.name} (${user.role})`;
                 loginEmailSelect.appendChild(option);
+
+                // *** NEW: Set the input field's value to the first user (Admin) ***
                 if (index === 0) {
                     loginEmailInput.value = user.email;
                 }
             });
+        
         } catch (error) {
             console.error(error.message);
-            showError('Could not load users from database.');
+            showError(error.message, true); // Suppress toast on initial load
             loginEmailSelect.innerHTML = '<option value="">Could not load users</option>';
             loginEmailInput.value = '';
             loginEmailInput.placeholder = 'Error loading users';
@@ -749,7 +799,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 
     // --- INITIALIZATION ---
-    // Always try to populate dropdown from database (API)
+    
     await populateLoginDropdown();
     await authService.init(showApp, showLogin);
 });
