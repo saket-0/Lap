@@ -1,28 +1,44 @@
 /**
- * A simple (and insecure) hash function for demonstration.
- * In a real blockchain, this would be a cryptographic hash like SHA-256.
- * This function is internal to this module and not exported.
+ * Converts an ArrayBuffer to a hexadecimal string.
+ * @param {ArrayBuffer} buffer The buffer to convert.
+ * @returns {string} The hexadecimal string.
  */
-const simpleHash = (data) => {
+function bufferToHex(buffer) {
+    return Array.from(new Uint8Array(buffer))
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
+}
+
+/**
+ * Calculates the SHA-256 hash of a given data object.
+ * This is an asynchronous function.
+ * @param {object} data The data to hash.
+ * @returns {Promise<string>} A promise that resolves to the hexadecimal hash string.
+ */
+async function calculateHash(data) {
     // Create a canonical, ordered string for consistent hashing
     const str = JSON.stringify(data, Object.keys(data).sort());
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-        const char = str.charCodeAt(i);
-        hash = (hash << 5) - hash + char;
-        hash = hash & hash; // Convert to 32bit integer
-    }
-    return '0x' + Math.abs(hash).toString(16);
-};
+    
+    // Encode the string as a UTF-8 byte array
+    const encoder = new TextEncoder();
+    const dataBuffer = encoder.encode(str);
+    
+    // Use the browser's built-in crypto API to calculate the hash
+    const hashBuffer = await crypto.subtle.digest('SHA-256', dataBuffer);
+    
+    // Convert the resulting ArrayBuffer to a hex string
+    return bufferToHex(hashBuffer);
+}
 
 /**
  * Creates a new block object.
+ * This is now an asynchronous function.
  * @param {number} index - The block's position in the chain.
  * @param {object} transaction - The data for this block (must be the full, rich object).
  * @param {string} previousHash - The hash of the preceding block.
- * @returns {object} A new block object with its hash calculated.
+ * @returns {Promise<object>} A promise that resolves to the new block object.
  */
-function createBlock(index, transaction, previousHash) {
+async function createBlock(index, transaction, previousHash) {
     const timestamp = new Date().toISOString();
     
     // Create the block *data* that will be hashed
@@ -33,8 +49,8 @@ function createBlock(index, transaction, previousHash) {
         previousHash,
     };
     
-    // The hash is calculated from the block's data
-    const hash = simpleHash(blockData);
+    // The hash is calculated asynchronously from the block's data
+    const hash = await calculateHash(blockData);
     
     // Return the full block, including its new hash
     return { ...blockData, hash };
@@ -42,18 +58,21 @@ function createBlock(index, transaction, previousHash) {
 
 /**
  * Creates the first (Genesis) block of the chain.
- * @returns {object} The Genesis block.
+ * This is now an asynchronous function.
+ * @returns {Promise<object>} A promise that resolves to the Genesis block.
  */
-function createGenesisBlock() {
-    return createBlock(0, { txType: "GENESIS" }, "0");
+async function createGenesisBlock() {
+    // Await the asynchronous createBlock function
+    return await createBlock(0, { txType: "GENESIS" }, "0");
 }
 
 /**
  * Verifies the integrity of the entire blockchain.
+ * This is now an asynchronous function.
  * @param {Array<object>} blockchainArray - The array of blocks to verify.
- * @returns {boolean} True if the chain is valid, false if tampered.
+ * @returns {Promise<boolean>} A promise that resolves to true if valid, false if tampered.
  */
-function isChainValid(blockchainArray) {
+async function isChainValid(blockchainArray) {
     // Iterate from the first block after Genesis
     for (let i = 1; i < blockchainArray.length; i++) {
         const currentBlock = blockchainArray[i];
@@ -66,14 +85,14 @@ function isChainValid(blockchainArray) {
         }
 
         // 2. Re-calculate the hash of the current block and check if it matches the stored hash
-        // This detects if the block's *data* (like the transaction) was changed.
         const blockDataToRecalculate = {
             index: currentBlock.index,
             timestamp: currentBlock.timestamp,
             transaction: currentBlock.transaction,
             previousHash: currentBlock.previousHash,
         };
-        const recalculatedHash = simpleHash(blockDataToRecalculate);
+        // Await the asynchronous hash calculation
+        const recalculatedHash = await calculateHash(blockDataToRecalculate);
 
         if (currentBlock.hash !== recalculatedHash) {
             console.error(`Chain invalid: Hash mismatch at block ${i}. Expected ${currentBlock.hash} but got ${recalculatedHash}`);

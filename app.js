@@ -1,4 +1,4 @@
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => { // *** MODIFIED: Made async ***
     
     // --- DOM ELEMENTS ---
     const loginOverlay = document.getElementById('login-overlay');
@@ -38,7 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
         appWrapper.classList.add('hidden');
     };
 
-    const showApp = () => {
+    const showApp = async () => { // *** MODIFIED: Made async ***
         loginOverlay.style.display = 'none';
         appWrapper.classList.remove('hidden');
         
@@ -52,7 +52,7 @@ document.addEventListener('DOMContentLoaded', () => {
         navLinks.admin.style.display = permissionService.can('VIEW_ADMIN_PANEL') ? 'flex' : 'none';
         navLinks.ledger.style.display = permissionService.can('VIEW_LEDGER') ? 'flex' : 'none';
 
-        loadBlockchain(); // from core.js
+        await loadBlockchain(); // *** MODIFIED: Await loadBlockchain ***
         rebuildInventoryState(); // from core.js
         navigateTo('dashboard');
     };
@@ -108,11 +108,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- EVENT HANDLERS (Delegated & Static) ---
 
     // Login/Logout
-    loginForm.addEventListener('submit', (e) => {
+    loginForm.addEventListener('submit', async (e) => { // *** MODIFIED: Made async ***
         e.preventDefault();
         const email = loginEmailSelect.value;
         const password = document.getElementById('login-password').value;
-        authService.login(email, password, showApp, showError); // Pass UI functions
+        await authService.login(email, password, showApp, showError); // *** MODIFIED: Await login ***
     });
     logoutButton.addEventListener('click', () => authService.logout(showLogin)); // Pass UI function
 
@@ -123,22 +123,22 @@ document.addEventListener('DOMContentLoaded', () => {
     navLinks.ledger.addEventListener('click', (e) => { e.preventDefault(); navigateTo('ledger'); });
 
     // Dynamic content events (delegated from appContent)
-    appContent.addEventListener('submit', (e) => {
+    appContent.addEventListener('submit', async (e) => { // *** MODIFIED: Made async ***
         e.preventDefault();
         
         if (e.target.id === 'add-item-form') {
             if (!permissionService.can('CREATE_ITEM')) return showError("Access Denied.");
-            handleAddItem(e.target);
+            await handleAddItem(e.target); // *** MODIFIED: Await handler ***
         }
         
         if (e.target.id === 'update-stock-form') {
             if (!permissionService.can('UPDATE_STOCK')) return showError("Access Denied.");
-            handleUpdateStock(e.target);
+            await handleUpdateStock(e.target); // *** MODIFIED: Await handler ***
         }
 
         if (e.target.id === 'move-stock-form') {
             if (!permissionService.can('UPDATE_STOCK')) return showError("Access Denied.");
-            handleMoveStock(e.target);
+            await handleMoveStock(e.target); // *** MODIFIED: Await handler ***
         }
     });
 
@@ -148,7 +148,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    appContent.addEventListener('click', (e) => {
+    appContent.addEventListener('click', async (e) => { // *** MODIFIED: Made async ***
         // Back to list
         if (e.target.closest('#back-to-list-button')) {
             navigateTo('products');
@@ -178,22 +178,22 @@ document.addEventListener('DOMContentLoaded', () => {
         // Admin buttons
         if (e.target.closest('#clear-db-button')) {
             if (!permissionService.can('CLEAR_DB')) return showError("Access Denied.");
-            handleClearDb();
+            await handleClearDb(); // *** MODIFIED: Await handler ***
         }
         if (e.target.closest('#verify-chain-button')) {
             if (!permissionService.can('VERIFY_CHAIN')) return showError("Access Denied.");
-            handleVerifyChain();
+            await handleVerifyChain(); // *** MODIFIED: Await handler ***
         }
         // User role change
         if (e.target.classList.contains('role-select')) {
             if (!permissionService.can('MANAGE_USERS')) return showError("Access Denied.");
-            handleRoleChange(e.target.dataset.userId, e.target.value);
+            await handleRoleChange(e.target.dataset.userId, e.target.value); // *** MODIFIED: Await handler ***
         }
     });
 
     // --- FORM HANDLERS (UI LOGIC) ---
 
-    const handleAddItem = (form) => {
+    const handleAddItem = async (form) => { // *** MODIFIED: Made async ***
         const itemSku = form.querySelector('#add-product-id').value;
         const itemName = form.querySelector('#add-product-name').value;
         const quantity = parseInt(form.querySelector('#add-quantity').value, 10);
@@ -219,7 +219,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         if (processTransaction(transaction, false, showError)) { // from core.js
-            addTransactionToChain(transaction); // from core.js
+            await addTransactionToChain(transaction); // *** MODIFIED: Await addTransactionToChain ***
             renderProductList();
             showSuccess(`Product ${itemName} added!`);
             form.reset();
@@ -229,7 +229,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    const handleUpdateStock = (form) => {
+    const handleUpdateStock = async (form) => { // *** MODIFIED: Made async ***
         const itemSku = document.getElementById('update-product-id').value;
         const quantity = parseInt(form.querySelector('#update-quantity').value, 10);
         const clickedButton = document.activeElement;
@@ -282,13 +282,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (success) {
-            addTransactionToChain(transaction); // from core.js
+            await addTransactionToChain(transaction); // *** MODIFIED: Await addTransactionToChain ***
             renderProductDetail(itemSku); // Re-render this view
             showSuccess(`Stock for ${itemSku} updated!`);
         }
     };
 
-    const handleMoveStock = (form) => {
+    const handleMoveStock = async (form) => { // *** MODIFIED: Made async ***
         const itemSku = document.getElementById('update-product-id').value; // Get SKU from hidden field
         const quantity = parseInt(form.querySelector('#move-quantity').value, 10);
         const fromLocation = form.querySelector('#move-from-location').value;
@@ -324,26 +324,26 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         if (processTransaction(transaction, false, showError)) { // core.js handles the logic
-            addTransactionToChain(transaction);
+            await addTransactionToChain(transaction); // *** MODIFIED: Await addTransactionToChain ***
             renderProductDetail(itemSku); // Re-render this view
             showSuccess(`Moved ${quantity} units of ${itemSku} from ${fromLocation} to ${toLocation}.`);
         }
     };
 
-    const handleClearDb = () => {
+    const handleClearDb = async () => { // *** MODIFIED: Made async ***
         localStorage.removeItem(DB_KEY);
         localStorage.removeItem(USERS_KEY);
         inventory.clear(); // from core.js
-        loadBlockchain(); // from core.js
+        await loadBlockchain(); // *** MODIFIED: Await loadBlockchain ***
         
-        authService.init(showApp, showLogin);
+        await authService.init(showApp, showLogin); // *** MODIFIED: Await authService.init ***
         
         navigateTo('dashboard');
         showSuccess("Database cleared and demo reset.");
     };
 
-    const handleVerifyChain = () => {
-        const isValid = isChainValid(blockchain); // from blockchain.js
+    const handleVerifyChain = async () => { // *** MODIFIED: Made async ***
+        const isValid = await isChainValid(blockchain); // *** MODIFIED: Await isChainValid ***
         if (isValid) {
             showSuccess("Verification complete: Blockchain is valid!");
         } else {
@@ -351,7 +351,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
     
-    const handleRoleChange = (userId, newRole) => {
+    const handleRoleChange = async (userId, newRole) => { // *** MODIFIED: Made async ***
         const user = usersDb.find(u => u.id === userId); // 'usersDb' from core.js
         if (user) {
             user.role = newRole;
@@ -361,7 +361,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (user.id === currentUser.id) { // 'currentUser' from core.js
                 currentUser.role = newRole;
                 localStorage.setItem(AUTH_KEY, JSON.stringify(currentUser));
-                showApp(); // Re-render UI with new permissions
+                await showApp(); // *** MODIFIED: Await showApp ***
             }
         }
     };
@@ -641,7 +641,7 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'STOCK_OUT':
                 transactionHtml = `<span class="font-semibold text-red-600">STOCK OUT</span> <strong>${quantity}</strong> of <strong>${itemSku}</strong> from <strong>${location}</strong>`;
                 detailsHtml = `<li>Before: ${beforeQuantity}, After: ${afterQuantity}</li>
-                               <li>User: <strong>${userName}</strong> (${employeeId})</li>`;
+                               <li>User: S<strong>${userName}</strong> (${employeeId})</li>`;
                 break;
         }
 
@@ -694,5 +694,5 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Start the app by calling the auth service
-    authService.init(showApp, showLogin); // from core.js
+    await authService.init(showApp, showLogin); // *** MODIFIED: Await authService.init ***
 });

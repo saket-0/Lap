@@ -12,7 +12,7 @@ let usersDb = [];
  * so this core file doesn't need to know about the DOM.
  */
 const authService = {
-    init: (showAppCallback, showLoginCallback) => {
+    init: async (showAppCallback, showLoginCallback) => { // *** MODIFIED: Made async ***
         // Populate users DB (simulates user table)
         if (!localStorage.getItem(USERS_KEY)) {
             localStorage.setItem(USERS_KEY, JSON.stringify(MOCK_USERS));
@@ -23,12 +23,12 @@ const authService = {
         const savedUser = localStorage.getItem(AUTH_KEY);
         if (savedUser) {
             currentUser = JSON.parse(savedUser);
-            showAppCallback();
+            await showAppCallback(); // *** MODIFIED: Await the callback ***
         } else {
             showLoginCallback();
         }
     },
-    login: (email, password, showAppCallback, showErrorCallback) => {
+    login: async (email, password, showAppCallback, showErrorCallback) => { // *** MODIFIED: Made async ***
         if (password !== 'password') {
             showErrorCallback("Invalid password. (Hint: use 'password')");
             return;
@@ -37,7 +37,7 @@ const authService = {
         if (user) {
             currentUser = user;
             localStorage.setItem(AUTH_KEY, JSON.stringify(currentUser));
-            showAppCallback();
+            await showAppCallback(); // *** MODIFIED: Await the callback ***
         } else {
             showErrorCallback("User not found.");
         }
@@ -86,10 +86,10 @@ const permissionService = {
 
 // --- CORE LOGIC (Blockchain & Inventory) ---
 
-const addTransactionToChain = (transaction) => {
+const addTransactionToChain = async (transaction) => { // *** MODIFIED: Made async ***
     const index = blockchain.length;
     const previousHash = blockchain[blockchain.length - 1].hash;
-    const newBlock = createBlock(index, transaction, previousHash); // from blockchain.js
+    const newBlock = await createBlock(index, transaction, previousHash); // *** MODIFIED: Await createBlock ***
     blockchain.push(newBlock);
     saveBlockchain();
 };
@@ -173,7 +173,7 @@ const saveBlockchain = () => {
     }
 };
 
-const loadBlockchain = () => {
+const loadBlockchain = async () => { // *** MODIFIED: Made async ***
     const savedChain = localStorage.getItem(DB_KEY);
     if (savedChain) {
         try {
@@ -182,11 +182,11 @@ const loadBlockchain = () => {
         } catch (e) {
             console.error("Failed to parse saved blockchain:", e);
             localStorage.removeItem(DB_KEY);
-            blockchain = [createGenesisBlock()];
+            blockchain = [await createGenesisBlock()]; // *** MODIFIED: Await createGenesisBlock ***
             saveBlockchain();
         }
     } else {
-        blockchain = [createGenesisBlock()];
+        blockchain = [await createGenesisBlock()]; // *** MODIFIED: Await createGenesisBlock ***
         saveBlockchain();
     }
 };
