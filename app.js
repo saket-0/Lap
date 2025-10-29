@@ -32,7 +32,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         ledger: document.getElementById('ledger-view-template'),
     };
     
-    const API_BASE_URL = 'http://localhost:3000';
+    // const API_BASE_URL = 'http://localhost:3000';
+    const API_BASE_URL = 'http://127.0.0.1:3000';
 
     // --- NAVIGATION & UI CONTROL ---
     // (This section is unchanged)
@@ -283,6 +284,30 @@ document.addEventListener('DOMContentLoaded', async () => {
                 timestamp: new Date().toISOString() 
             };
             success = processTransaction(transaction, false, showError);
+
+
+
+        // } else if (actionType === 'STOCK_OUT') {
+        //     const locationOut = form.querySelector('#update-location').value;
+        //     beforeQuantity = product.locations.get(locationOut) || 0;
+        //     afterQuantity = beforeQuantity - quantity;
+            
+        //     transaction = { 
+        //         txType: "STOCK_OUT", 
+        //         itemSku, 
+        //         quantity, 
+        //         location: locationOut, 
+        //         beforeQuantity, 
+        //         afterQuantity,
+        //         userId: user.id, 
+        //         employeeId: user.employeeId, 
+        //         userName: user.name, 
+        //         timestamp: new Date().toISOString() 
+        //     };
+        //     success = processTransaction(transaction, false, showError);
+        // }
+
+
         } else if (actionType === 'STOCK_OUT') {
             const locationOut = form.querySelector('#update-location').value;
             beforeQuantity = product.locations.get(locationOut) || 0;
@@ -296,7 +321,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 beforeQuantity, 
                 afterQuantity,
                 userId: user.id, 
-                employeeId: user.employeeId, 
+                employeeId: user.employeeId, // <-- ADD THIS LINE
                 userName: user.name, 
                 timestamp: new Date().toISOString() 
             };
@@ -717,7 +742,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             case 'STOCK_OUT':
                 transactionHtml = `<span class="font-semibold text-red-600">STOCK OUT</span> <strong>${quantity}</strong> of <strong>${itemSku}</strong> from <strong>${location}</strong>`;
                 detailsHtml = `<li>Before: ${beforeQuantity}, After: ${afterQuantity}</li>
-                               <li>User: S<strong>${userName}</strong> (${employeeId})</li>`;
+                               <li>User: <strong>${userName}</strong> (${employeeId})</li>`;
                 break;
         }
 

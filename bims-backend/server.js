@@ -18,12 +18,24 @@ const pool = new Pool({
     port: 5432,
 });
 
+//=========================================================================================
+//=========================================================================================
+// // --- 2. Middleware Setup ---
+// app.use(cors({
+//     origin: 'http://127.0.0.1:5500', // Allow your index.html origin
+//     credentials: true // Allow cookies
+// }));
+// app.use(express.json()); // To parse JSON request bodies
+
 // --- 2. Middleware Setup ---
 app.use(cors({
-    origin: 'http://127.0.0.1:5500', // Allow your index.html origin
+    origin: ['http://127.0.0.1:5500', 'http://localhost:5500'], // Allow both origins
     credentials: true // Allow cookies
 }));
 app.use(express.json()); // To parse JSON request bodies
+
+//=========================================================================================
+//=========================================================================================
 
 // --- 3. Session Setup ---
 app.use(session({
