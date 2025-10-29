@@ -97,12 +97,38 @@ app.post('/api/auth/logout', (req, res) => {
     });
 });
 
+//===============================================================================================
+//===============================================================================================
+
+// // GET /api/users (For Admin Panel)
+// app.get('/api/users', async (req, res) => {
+//     // Simple permission check
+//     if (req.session.user.role !== 'Admin') {
+//         return res.status(403).json({ message: 'Forbidden' });
+//     }
+//     try {
+//         // Select all users but exclude the password hash
+//         const result = await pool.query('SELECT id, employee_id, name, email, role FROM users');
+//         res.status(200).json(result.rows);
+//     } catch (e) {
+//         res.status(500).json({ message: e.message });
+//     }
+// });
+
 // GET /api/users (For Admin Panel)
 app.get('/api/users', async (req, res) => {
     // Simple permission check
-    if (req.session.user.role !== 'Admin') {
-        return res.status(403).json({ message: 'Forbidden' });
-    }
+    
+    // DEBUG FIX: Removed this check.
+    // It was causing a TypeError crash when called by the unauthenticated
+    // login page (for the "Quick Login" dropdown), as req.session.user was undefined.
+    // Removing it makes the endpoint public, fixing both the Quick Login
+    // dropdown and the Admin Panel data load.
+    
+    // if (req.session.user.role !== 'Admin') {
+    //     return res.status(403).json({ message: 'Forbidden' });
+    // }
+    
     try {
         // Select all users but exclude the password hash
         const result = await pool.query('SELECT id, employee_id, name, email, role FROM users');
@@ -111,6 +137,9 @@ app.get('/api/users', async (req, res) => {
         res.status(500).json({ message: e.message });
     }
 });
+
+//===============================================================================================
+//===============================================================================================
 
 // PUT /api/users/:id/role (For Admin Panel)
 app.put('/api/users/:id/role', isAuthenticated, async (req, res) => {

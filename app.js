@@ -600,43 +600,46 @@ document.addEventListener('DOMContentLoaded', async () => {
     const renderAdminPanel = async () => {
         const tableBody = appContent.querySelector('#user-management-table');
         tableBody.innerHTML = '<tr><td colspan="4" class="table-cell text-center">Loading users...</td></tr>';
-        
+        let usersDb = [];
         try {
             const response = await fetch(`${API_BASE_URL}/api/users`, {
                 credentials: 'include'
             });
-            
             if (!response.ok) {
-                const err = await response.json();
-                throw new Error(err.message || 'Failed to fetch users');
+                throw new Error('Failed to fetch users');
             }
-            
-            const usersDb = await response.json();
-            tableBody.innerHTML = '';
-
-            usersDb.forEach(user => {
-                const row = document.createElement('tr');
-                const isCurrentUser = user.id === currentUser.id;
-                
-                row.innerHTML = `
-                    <td class="table-cell font-medium">${user.name}</td>
-                    <td class="table-cell text-slate-500">${user.employeeId}</td>
-                    <td class="table-cell text-slate-500">${user.email}</td>
-                    <td class="table-cell">
-                        <select data-user-id="${user.id}" class="role-select block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" ${isCurrentUser ? 'disabled' : ''}>
-                            <option value="Admin" ${user.role === 'Admin' ? 'selected' : ''}>Admin</option>
-                            <option value="Inventory Manager" ${user.role === 'Inventory Manager' ? 'selected' : ''}>Inventory Manager</option>
-                            <option value="Auditor" ${user.role === 'Auditor' ? 'selected' : ''}>Auditor</option>
-                        </select>
-                    </td>
-                `;
-                tableBody.appendChild(row);
-            });
-
+            // Map DB fields to frontend expected fields
+            const dbUsers = await response.json();
+            usersDb = dbUsers.map(user => ({
+                id: user.id,
+                employeeId: user.employee_id, // map DB field to frontend
+                name: user.name,
+                email: user.email,
+                role: user.role
+            }));
         } catch (error) {
-            showError(error.message);
+            showError('Error loading users and no fallback available.');
             tableBody.innerHTML = `<tr><td colspan="4" class="table-cell text-center text-red-600">Error loading users.</td></tr>`;
+            return;
         }
+        tableBody.innerHTML = '';
+        usersDb.forEach(user => {
+            const row = document.createElement('tr');
+            const isCurrentUser = user.id === currentUser.id;
+            row.innerHTML = `
+                <td class="table-cell font-medium">${user.name}</td>
+                <td class="table-cell text-slate-500">${user.employeeId}</td>
+                <td class="table-cell text-slate-500">${user.email}</td>
+                <td class="table-cell">
+                    <select data-user-id="${user.id}" class="role-select block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" ${isCurrentUser ? 'disabled' : ''}>
+                        <option value="Admin" ${user.role === 'Admin' ? 'selected' : ''}>Admin</option>
+                        <option value="Inventory Manager" ${user.role === 'Inventory Manager' ? 'selected' : ''}>Inventory Manager</option>
+                        <option value="Auditor" ${user.role === 'Auditor' ? 'selected' : ''}>Auditor</option>
+                    </select>
+                </td>
+            `;
+            tableBody.appendChild(row);
+        });
     };
 
     const createLedgerBlockElement = (block) => {
@@ -716,7 +719,7 @@ document.addEventListener('DOMContentLoaded', async () => {
      */
     const populateLoginDropdown = async () => {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/users`); // Remember, this must be public!
+            const response = await fetch(`${API_BASE_URL}/api/users`);
             if (!response.ok) {
                 const err = await response.json();
                 if (err.message === 'Not authenticated') {
@@ -724,26 +727,20 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
                 throw new Error(err.message || 'Failed to fetch users');
             }
-            
             const users = await response.json();
-            
-            loginEmailSelect.innerHTML = ''; // Clear select
-            
+            loginEmailSelect.innerHTML = '';
             users.forEach((user, index) => {
                 const option = document.createElement('option');
                 option.value = user.email;
                 option.textContent = `${user.name} (${user.role})`;
                 loginEmailSelect.appendChild(option);
-
-                // *** NEW: Set the input field's value to the first user (Admin) ***
                 if (index === 0) {
                     loginEmailInput.value = user.email;
                 }
             });
-        
         } catch (error) {
             console.error(error.message);
-            showError(error.message);
+            showError('Could not load users from database.');
             loginEmailSelect.innerHTML = '<option value="">Could not load users</option>';
             loginEmailInput.value = '';
             loginEmailInput.placeholder = 'Error loading users';
@@ -752,7 +749,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 
     // --- INITIALIZATION ---
-    
+    // Always try to populate dropdown from database (API)
     await populateLoginDropdown();
     await authService.init(showApp, showLogin);
 });
