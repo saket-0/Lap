@@ -11,10 +11,10 @@ const port = 3000; // Your backend will run on http://localhost:3000
 
 // --- 1. Database Connection ---
 const pool = new Pool({
-    user: 'your_db_user',
+    user: 'deep',
     host: 'localhost',
     database: 'bims',
-    password: 'your_db_password',
+    password: 'password',
     port: 5432,
 });
 

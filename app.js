@@ -3,26 +3,27 @@ document.addEventListener('DOMContentLoaded', async () => {
     // --- DOM ELEMENTS ---
     const loginOverlay = document.getElementById('login-overlay');
     const loginForm = document.getElementById('login-form');
-    const loginEmailSelect = document.getElementById('login-email');
+    
+    // *** MODIFIED: Get new login elements ***
+    const loginEmailInput = document.getElementById('login-email-input'); // The text input
+    const loginEmailSelect = document.getElementById('login-email-select'); // The dropdown
+    const quickLoginButton = document.getElementById('quick-login-button'); // The new button
+    
     const appWrapper = document.getElementById('app-wrapper');
     const appContent = document.getElementById('app-content');
     const logoutButton = document.getElementById('logout-button');
     
-    // Nav links
+    // (Rest of the DOM elements are the same)
     const navLinks = {
         dashboard: document.getElementById('nav-dashboard'),
         products: document.getElementById('nav-products'),
         admin: document.getElementById('nav-admin'),
         ledger: document.getElementById('nav-ledger'),
     };
-
-    // Toast Elements
     const errorToast = document.getElementById('error-toast');
     const errorMessage = document.getElementById('error-message');
     const successToast = document.getElementById('success-toast');
     const successMessage = document.getElementById('success-message');
-
-    // Templates
     const templates = {
         dashboard: document.getElementById('dashboard-view-template'),
         productList: document.getElementById('product-list-view-template'),
@@ -31,7 +32,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         ledger: document.getElementById('ledger-view-template'),
     };
     
-    // *** MODIFIED: Define the base URL for your backend server ***
     const API_BASE_URL = 'http://localhost:3000';
 
     // --- NAVIGATION & UI CONTROL ---
@@ -83,7 +83,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 navLinks.admin.classList.add('active');
                 viewTemplate = templates.admin.content.cloneNode(true);
                 appContent.appendChild(viewTemplate);
-                renderAdminPanel(); // *** MODIFIED: This is now async ***
+                renderAdminPanel();
                 break;
 
             case 'ledger':
@@ -105,24 +105,35 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
     
     // --- EVENT HANDLERS (Delegated & Static) ---
-    // (This section is mostly unchanged)
-    
-    // Login/Logout
+
+    // *** MODIFIED: Main login form uses the text input ***
     loginForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const email = loginEmailSelect.value;
+        const email = loginEmailInput.value; // Use the input field
         const password = document.getElementById('login-password').value;
         await authService.login(email, password, showApp, showError);
     });
-    logoutButton.addEventListener('click', () => authService.logout(showLogin));
 
-    // Sidebar Navigation
+    // *** NEW: Quick login button uses the dropdown ***
+    quickLoginButton.addEventListener('click', async () => {
+        const email = loginEmailSelect.value; // Use the select field
+        const password = "password"; // Hardcoded password
+        await authService.login(email, password, showApp, showError);
+    });
+
+    // *** NEW: Sync select and input fields for convenience ***
+    loginEmailSelect.addEventListener('change', () => {
+        loginEmailInput.value = loginEmailSelect.value;
+    });
+
+
+    logoutButton.addEventListener('click', () => authService.logout(showLogin));
     navLinks.dashboard.addEventListener('click', (e) => { e.preventDefault(); navigateTo('dashboard'); });
     navLinks.products.addEventListener('click', (e) => { e.preventDefault(); navigateTo('products'); });
     navLinks.admin.addEventListener('click', (e) => { e.preventDefault(); navigateTo('admin'); });
     navLinks.ledger.addEventListener('click', (e) => { e.preventDefault(); navigateTo('ledger'); });
 
-    // Dynamic content events
+    // (All other event listeners are unchanged)
     appContent.addEventListener('submit', async (e) => {
         e.preventDefault();
         
@@ -181,16 +192,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             await handleVerifyChain();
         }
         
-        // *** MODIFIED: This now calls handleRoleChange ***
         if (e.target.classList.contains('role-select')) {
             if (!permissionService.can('MANAGE_USERS')) return showError("Access Denied.");
-            // Pass the user ID and the new role value
             await handleRoleChange(e.target.dataset.userId, e.target.value);
         }
     });
 
     // --- FORM HANDLERS (UI LOGIC) ---
-    // (handleAddItem, handleUpdateStock, handleMoveStock are unchanged)
+    // (handleAddItem, handleUpdateStock, handleMoveStock, handleClearDb, handleVerifyChain, handleRoleChange are all unchanged)
 
     const handleAddItem = async (form) => {
         const itemSku = form.querySelector('#add-product-id').value;
@@ -330,19 +339,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     const handleClearDb = async () => {
-        localStorage.removeItem(DB_KEY); // *** MODIFIED: Only clear blockchain key ***
+        localStorage.removeItem(DB_KEY);
         inventory.clear();
         await loadBlockchain();
-        
-        // *** MODIFIED: We re-run init. This will log us out if backend reset (which we didn't build) ***
-        // *** Or just refresh our state. ***
         await authService.init(showApp, showLogin); 
-        
         navigateTo('dashboard');
         showSuccess("Local blockchain cleared.");
         
-        // *** MODIFIED: If authService.init failed, we'll be at the login screen.
-        // We should re-populate the dropdown.
         if (!currentUser) {
             await populateLoginDropdown();
         }
@@ -357,36 +360,25 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     };
     
-    /**
-     * *** MODIFIED: This function now calls the backend API to update a user's role. ***
-     */
     const handleRoleChange = async (userId, newRole) => {
         try {
             const response = await fetch(`${API_BASE_URL}/api/users/${userId}/role`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                credentials: 'include', // Essential for auth
+                credentials: 'include',
                 body: JSON.stringify({ role: newRole })
             });
-
             const data = await response.json();
-
             if (!response.ok) {
                 throw new Error(data.message || 'Failed to update role');
             }
-
             showSuccess(`Role for ${data.user.name} updated to ${newRole}.`);
-
-            // If we updated ourselves, our permissions might have changed.
-            // Re-fetch our own user data and re-render the app
             if (data.user.id === currentUser.id) {
-                currentUser = data.user; // Update current user
-                await showApp(); // Re-render the app with new permissions
+                currentUser = data.user;
+                await showApp();
             }
-
         } catch (error) {
             showError(error.message);
-            // Re-render admin panel to revert the dropdown to its original state
             renderAdminPanel();
         }
     };
@@ -605,16 +597,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     };
     
-    /**
-     * *** MODIFIED: This function now fetches user data from the backend API. ***
-     */
     const renderAdminPanel = async () => {
         const tableBody = appContent.querySelector('#user-management-table');
         tableBody.innerHTML = '<tr><td colspan="4" class="table-cell text-center">Loading users...</td></tr>';
         
         try {
             const response = await fetch(`${API_BASE_URL}/api/users`, {
-                credentials: 'include' // Essential for auth
+                credentials: 'include'
             });
             
             if (!response.ok) {
@@ -623,7 +612,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
             
             const usersDb = await response.json();
-            tableBody.innerHTML = ''; // Clear loading message
+            tableBody.innerHTML = '';
 
             usersDb.forEach(user => {
                 const row = document.createElement('tr');
@@ -650,9 +639,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     };
 
-    /**
-     * Helper: Creates a rich ledger block element for display
-     */
     const createLedgerBlockElement = (block) => {
         const blockElement = document.createElement('div');
         blockElement.className = 'border border-slate-200 rounded-lg p-3 bg-white shadow-sm';
@@ -726,17 +712,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     /**
-     * *** NEW HELPER FUNCTION ***
-     * Fetches users from the backend and populates the login dropdown.
+     * *** MODIFIED: This function now populates BOTH the select and the input field. ***
      */
     const populateLoginDropdown = async () => {
         try {
-            // This fetch call does not need 'credentials' if we make the endpoint public
-            const response = await fetch(`${API_BASE_URL}/api/users`);
+            const response = await fetch(`${API_BASE_URL}/api/users`); // Remember, this must be public!
             if (!response.ok) {
                 const err = await response.json();
-                // We add this check because the server will send 'Not authenticated'
-                // if we forget to make the endpoint public.
                 if (err.message === 'Not authenticated') {
                     throw new Error('Failed to fetch users. (Hint: Make GET /api/users public on server.js)');
                 }
@@ -745,27 +727,32 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             const users = await response.json();
             
-            loginEmailSelect.innerHTML = ''; // Clear any existing options
-            users.forEach(user => {
+            loginEmailSelect.innerHTML = ''; // Clear select
+            
+            users.forEach((user, index) => {
                 const option = document.createElement('option');
                 option.value = user.email;
                 option.textContent = `${user.name} (${user.role})`;
                 loginEmailSelect.appendChild(option);
+
+                // *** NEW: Set the input field's value to the first user (Admin) ***
+                if (index === 0) {
+                    loginEmailInput.value = user.email;
+                }
             });
         
         } catch (error) {
             console.error(error.message);
             showError(error.message);
             loginEmailSelect.innerHTML = '<option value="">Could not load users</option>';
+            loginEmailInput.value = '';
+            loginEmailInput.placeholder = 'Error loading users';
         }
     };
 
 
     // --- INITIALIZATION ---
     
-    // *** MODIFIED: Populate login dropdown from the new backend API ***
     await populateLoginDropdown();
-
-    // Start the app by checking for a server session
     await authService.init(showApp, showLogin);
 });
