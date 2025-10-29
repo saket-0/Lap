@@ -143,6 +143,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // *** NEW: Listen for 'input' events for the search bar ***
+    appContent.addEventListener('input', (e) => {
+        if (e.target.id === 'product-search-input') {
+            renderProductList(); // Re-render the list on every keystroke
+        }
+    });
+
     appContent.addEventListener('click', (e) => {
         // Back to list
         if (e.target.closest('#back-to-list-button')) {
@@ -163,6 +170,14 @@ document.addEventListener('DOMContentLoaded', () => {
             navigateTo('detail', { productId: productCard.dataset.productId });
             return;
         }
+
+        // *** NEW: Low stock item click ***
+        const lowStockItem = e.target.closest('.low-stock-item');
+        if (lowStockItem && lowStockItem.dataset.productId) {
+            navigateTo('detail', { productId: lowStockItem.dataset.productId });
+            return;
+        }
+
         // Admin buttons
         if (e.target.closest('#clear-db-button')) {
             if (!permissionService.can('CLEAR_DB')) return showError("Access Denied.");
@@ -186,10 +201,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const itemName = form.querySelector('#add-product-name').value;
         const quantity = parseInt(form.querySelector('#add-quantity').value, 10);
         const toLocation = form.querySelector('#add-to').value;
-        // *** MODIFIED: Read price from new field ***
+        // *** MODIFIED: Read price and new category field ***
         const price = parseFloat(form.querySelector('#add-price').value);
+        const category = form.querySelector('#add-product-category').value;
 
-        if (!itemSku || !itemName || !quantity || quantity <= 0 || !price || price < 0) {
+        if (!itemSku || !itemName || !category || !quantity || quantity <= 0 || !price || price < 0) {
             return showError("Please fill out all fields with valid data (Price/Qty > 0).");
         }
 
@@ -200,6 +216,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const transaction = {
             txType: "CREATE_ITEM", itemSku, itemName, quantity,
             price, // *** MODIFIED: Add price to transaction ***
+            category, // *** NEW: Add category to transaction ***
             beforeQuantity, afterQuantity, toLocation,
             userId: user.id, employeeId: user.employeeId, userName: user.name,
             timestamp: new Date().toISOString()
@@ -212,6 +229,7 @@ document.addEventListener('DOMContentLoaded', () => {
             form.reset();
             form.querySelector('#add-product-id').value = `SKU-${Math.floor(100 + Math.random() * 900)}`;
             form.querySelector('#add-product-name').value = "New Product";
+            form.querySelector('#add-product-category').value = "Electronics";
         }
     };
 
@@ -375,17 +393,13 @@ document.addEventListener('DOMContentLoaded', () => {
         appContent.querySelector('#clear-db-button').style.display = permissionService.can('CLEAR_DB') ? 'flex' : 'none';
         appContent.querySelector('#verify-chain-button').style.display = permissionService.can('VERIFY_CHAIN') ? 'flex' : 'none';
         
-        // Render Recent Activity (Check if elements exist, they might not in this template)
+        // Render Recent Activity
         const activityContainer = appContent.querySelector('#recent-activity-container');
-        if (activityContainer) {
+        if (activityContainer && permissionService.can('VIEW_LEDGER')) {
             const activityList = appContent.querySelector('#recent-activity-list');
             const emptyMessage = appContent.querySelector('#recent-activity-empty');
             const viewLedgerLink = appContent.querySelector('#dashboard-view-ledger');
 
-            if (!permissionService.can('VIEW_LEDGER')) {
-                activityContainer.style.display = 'none';
-                return;
-            }
             viewLedgerLink.style.display = 'block';
             activityList.innerHTML = '';
 
@@ -402,22 +416,86 @@ document.addEventListener('DOMContentLoaded', () => {
                     activityList.appendChild(createLedgerBlockElement(block));
                 });
             }
+        } else if (activityContainer) {
+            activityContainer.style.display = 'none';
+        }
+
+        // *** NEW: Render Low Stock Items ***
+        const lowStockContainer = appContent.querySelector('#low-stock-container');
+        if (lowStockContainer && permissionService.can('VIEW_PRODUCTS')) {
+            const lowStockList = appContent.querySelector('#low-stock-list');
+            const emptyMessage = appContent.querySelector('#low-stock-empty');
+            const thresholdLabel = appContent.querySelector('#low-stock-threshold-label');
+            
+            lowStockList.innerHTML = '';
+            const LOW_STOCK_THRESHOLD = 20;
+            thresholdLabel.textContent = `(Threshold: ${LOW_STOCK_THRESHOLD} units)`;
+            
+            const lowStockProducts = [];
+            inventory.forEach((product, productId) => {
+                let totalStock = 0;
+                product.locations.forEach(qty => totalStock += qty);
+                
+                if (totalStock > 0 && totalStock <= LOW_STOCK_THRESHOLD) {
+                    lowStockProducts.push({
+                        id: productId,
+                        name: product.productName,
+                        stock: totalStock
+                    });
+                }
+            });
+
+            if (lowStockProducts.length === 0) {
+                emptyMessage.style.display = 'block';
+            } else {
+                emptyMessage.style.display = 'none';
+                lowStockProducts
+                    .sort((a, b) => a.stock - b.stock) // Show lowest first
+                    .forEach(product => {
+                        const itemElement = document.createElement('div');
+                        itemElement.className = 'low-stock-item p-3 border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer';
+                        itemElement.dataset.productId = product.id;
+                        itemElement.innerHTML = `
+                            <div class="flex justify-between items-center">
+                                <div>
+                                    <p class="font-semibold text-indigo-700">${product.name}</p>
+                                    <p class="text-xs text-slate-500">${product.id}</p>
+                                </div>
+                                <span class="text-lg font-bold text-red-600">${product.stock} units</span>
+                            </div>
+                        `;
+                        lowStockList.appendChild(itemElement);
+                    });
+            }
+        } else if (lowStockContainer) {
+            lowStockContainer.style.display = 'none';
         }
     };
 
     const renderProductList = () => {
         const productGrid = appContent.querySelector('#product-grid');
         if (!productGrid) return;
+        
+        // *** NEW: Get search term ***
+        const searchInput = appContent.querySelector('#product-search-input');
+        const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
+
         productGrid.innerHTML = ''; 
         
         appContent.querySelector('#add-item-container').style.display = permissionService.can('CREATE_ITEM') ? 'block' : 'none';
 
-        if (inventory.size === 0) { // 'inventory' from core.js
-            productGrid.innerHTML = `<p class="text-slate-500 lg:col-span-3">No products in inventory. ${permissionService.can('CREATE_ITEM') ? 'Add one above!' : ''}</p>`;
-            return;
-        }
+        let productsFound = 0;
 
         inventory.forEach((product, productId) => {
+            const productName = product.productName.toLowerCase();
+            const sku = productId.toLowerCase();
+
+            // *** NEW: Apply search filter ***
+            if (searchTerm && !productName.includes(searchTerm) && !sku.includes(searchTerm)) {
+                return; // Skip this product
+            }
+            productsFound++;
+
             const productCard = document.createElement('div');
             productCard.className = 'product-card';
             productCard.dataset.productId = productId;
@@ -425,11 +503,13 @@ document.addEventListener('DOMContentLoaded', () => {
             let totalStock = 0;
             product.locations.forEach(qty => totalStock += qty);
 
+            // *** MODIFIED: Added Category display ***
             productCard.innerHTML = `
                 <div class="product-card-placeholder"><i class="ph-bold ph-package"></i></div>
                 <div class="product-card-content">
                     <h3 class="font-semibold text-lg text-indigo-700 truncate">${product.productName}</h3>
-                    <p class="text-xs text-slate-500 mb-2">${productId}</p>
+                    <p class="text-xs text-slate-500 mb-1">${productId}</p>
+                    <p class="text-xs font-medium text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded-full inline-block mb-2">${product.category || 'Uncategorized'}</p>
                     <hr class="my-2">
                     <div class="flex justify-between items-center text-sm font-semibold">
                         <span>Total Stock:</span>
@@ -439,6 +519,15 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
             productGrid.appendChild(productCard);
         });
+
+        // *** NEW: Show message if no products are found ***
+        if (productsFound === 0) {
+            if (inventory.size === 0) {
+                productGrid.innerHTML = `<p class="text-slate-500 lg:col-span-3">No products in inventory. ${permissionService.can('CREATE_ITEM') ? 'Add one above!' : ''}</p>`;
+            } else {
+                productGrid.innerHTML = `<p class="text-slate-500 lg:col-span-3">No products found matching "${searchTerm}".</p>`;
+            }
+        }
     };
 
     const renderProductDetail = (productId) => {
@@ -452,9 +541,10 @@ document.addEventListener('DOMContentLoaded', () => {
         appContent.querySelector('#detail-product-id').textContent = productId;
         appContent.querySelector('#update-product-id').value = productId; // Set hidden SKU field
 
-        // *** MODIFIED: Display price ***
-    const price = product.price || 0;
-    appContent.querySelector('#detail-product-price').textContent = `₹${price.toFixed(2)}`;
+        // *** MODIFIED: Display price and category ***
+        const price = product.price || 0;
+        appContent.querySelector('#detail-product-price').textContent = `₹${price.toFixed(2)}`;
+        appContent.querySelector('#detail-product-category').textContent = product.category || 'Uncategorized';
 
 
         const stockLevelsDiv = appContent.querySelector('#detail-stock-levels');
@@ -539,17 +629,18 @@ document.addEventListener('DOMContentLoaded', () => {
         const blockElement = document.createElement('div');
         blockElement.className = 'border border-slate-200 rounded-lg p-3 bg-white shadow-sm';
         
-        // *** MODIFIED: Destructure 'price' ***
-        const { txType, itemSku, itemName, quantity, fromLocation, toLocation, location, userName, employeeId, beforeQuantity, afterQuantity, price } = block.transaction;
+        // *** MODIFIED: Destructure 'price' and 'category' ***
+        const { txType, itemSku, itemName, quantity, fromLocation, toLocation, location, userName, employeeId, beforeQuantity, afterQuantity, price, category } = block.transaction;
         let transactionHtml = '';
         let detailsHtml = '';
 
         switch (txType) {
             case 'CREATE_ITEM':
                 transactionHtml = `<span class="font-semibold text-green-700">CREATE</span> <strong>${quantity}</strong> of <strong>${itemName}</strong> (${itemSku}) to <strong>${toLocation}</strong>`;
-                // *** MODIFIED: Add price to details ***
+                // *** MODIFIED: Add price and category to details ***
                 detailsHtml = `<li>User: <strong>${userName}</strong> (${employeeId})</li>
-                               <li>Price: <strong>₹${(price || 0).toFixed(2)}</strong></li>`;
+                               <li>Price: <strong>₹${(price || 0).toFixed(2)}</strong></li>
+                               <li>Category: <strong>${category || 'N/A'}</strong></li>`;
                 break;
             case 'MOVE':
                 transactionHtml = `<span class="font-semibold text-blue-600">MOVE</span> <strong>${quantity}</strong> of <strong>${itemSku}</strong>`;

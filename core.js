@@ -95,8 +95,8 @@ const addTransactionToChain = (transaction) => {
 };
 
 const processTransaction = (transaction, suppressErrors = false, showErrorCallback) => {
-    // *** MODIFIED: Added 'price' ***
-    const { txType, itemSku, itemName, quantity, fromLocation, toLocation, location, price } = transaction;
+    // *** MODIFIED: Added 'price' and 'category' ***
+    const { txType, itemSku, itemName, quantity, fromLocation, toLocation, location, price, category } = transaction;
 
     let product;
     if (txType !== 'CREATE_ITEM' && !inventory.has(itemSku)) {
@@ -118,6 +118,7 @@ const processTransaction = (transaction, suppressErrors = false, showErrorCallba
                  inventory.set(itemSku, {
                     productName: itemName,
                     price: price || 0, // *** ADDED: Store the price ***
+                    category: category || 'Uncategorized', // *** NEW: Store the category ***
                     locations: new Map()
                 });
             }

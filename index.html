@@ -109,16 +109,27 @@
                 </div>
             </div>
 
-            <div id="recent-activity-container" class="bg-white p-6 rounded-lg shadow-md">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-2xl font-semibold text-slate-800">Recent Activity</h2>
-                    <a href="#" id="dashboard-view-ledger" class="text-sm font-medium text-indigo-600 hover:text-indigo-800">View Full Ledger &rarr;</a>
-                </div>
-                <div id="recent-activity-list" class="space-y-4 max-h-96 overflow-y-auto pr-2">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div id="recent-activity-container" class="bg-white p-6 rounded-lg shadow-md">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-2xl font-semibold text-slate-800">Recent Activity</h2>
+                        <a href="#" id="dashboard-view-ledger" class="text-sm font-medium text-indigo-600 hover:text-indigo-800">View Full Ledger &rarr;</a>
                     </div>
-                <p id="recent-activity-empty" class="text-sm text-slate-500" style="display: none;">No transactions found.</p>
-            </div>
+                    <div id="recent-activity-list" class="space-y-4 max-h-96 overflow-y-auto pr-2">
+                        </div>
+                    <p id="recent-activity-empty" class="text-sm text-slate-500" style="display: none;">No transactions found.</p>
+                </div>
 
+                <div id="low-stock-container" class="bg-white p-6 rounded-lg shadow-md">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-2xl font-semibold text-slate-800">Low Stock Items</h2>
+                        <span id="low-stock-threshold-label" class="text-sm font-medium text-slate-500"></span>
+                    </div>
+                    <div id="low-stock-list" class="space-y-3 max-h-96 overflow-y-auto pr-2">
+                        </div>
+                    <p id="low-stock-empty" class="text-sm text-slate-500" style="display: none;">All items are well-stocked.</p>
+                </div>
+            </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div class="bg-white p-6 rounded-lg shadow-md">
@@ -149,13 +160,17 @@
                 
                 <form id="add-item-form" class="space-y-4">
                     <div class="grid grid-cols-1 md:grid-cols-6 gap-6">
-                        <div class="md:col-span-3">
+                        <div class="md:col-span-2">
                             <label for="add-product-id" class="block text-sm font-medium text-slate-700">Product ID (SKU)</label>
                             <input type="text" id="add-product-id" value="SKU-101" class="form-input-underline" required>
                         </div>
-                        <div class="md:col-span-3">
+                        <div class="md:col-span-2">
                             <label for="add-product-name" class="block text-sm font-medium text-slate-700">Product Name</label>
                             <input type="text" id="add-product-name" value="Smart Watch" class="form-input-underline" required>
+                        </div>
+                        <div class="md:col-span-2">
+                            <label for="add-product-category" class="block text-sm font-medium text-slate-700">Category</label>
+                            <input type="text" id="add-product-category" value="Electronics" class="form-input-underline" required>
                         </div>
                         <div class="md:col-span-2">
                             <label for="add-quantity" class="block text-sm font-medium text-slate-700">Initial Quantity</label>
@@ -181,7 +196,13 @@
                 </div>
 
             <div>
-                <h2 class="text-3xl font-semibold mb-4 text-slate-800">Product Inventory</h2>
+                <div class="flex flex-col md:flex-row justify-between md:items-center mb-4 gap-4">
+                    <h2 class="text-3xl font-semibold text-slate-800">Product Inventory</h2>
+                    <div class="relative w-full md:w-1/3">
+                        <input type="text" id="product-search-input" placeholder="Search by SKU or Name..." class="w-full pl-10 pr-4 py-2 rounded-md border border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                        <i class="ph-bold ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                    </div>
+                </div>
                 <div id="product-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     </div>
             </div>
@@ -208,6 +229,7 @@
                             <div class="w-full md:w-2/3">
                                 <h2 id="detail-product-name" class="text-4xl font-bold text-slate-900">Product Name</h2>
                                 <p id="detail-product-id" class="text-sm text-slate-500 mt-1">SKU-000</p>
+                                <p id="detail-product-category" class="text-sm font-medium text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded-full inline-block mt-2">Category</p>
                                 <p id="detail-product-price" class="text-3xl font-bold text-slate-700 mt-2">₹0.00</p>
                                 <hr class="my-4">
                                 <h3 class="text-lg font-semibold text-slate-800 mb-2">Current Stock Levels</h3>
