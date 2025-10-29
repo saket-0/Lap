@@ -1,4 +1,4 @@
-document.addEventListener('DOMContentLoaded', async () => { // *** MODIFIED: Made async ***
+document.addEventListener('DOMContentLoaded', async () => {
     
     // --- DOM ELEMENTS ---
     const loginOverlay = document.getElementById('login-overlay');
@@ -30,37 +30,36 @@ document.addEventListener('DOMContentLoaded', async () => { // *** MODIFIED: Mad
         admin: document.getElementById('admin-view-template'),
         ledger: document.getElementById('ledger-view-template'),
     };
+    
+    // *** MODIFIED: Define the base URL for your backend server ***
+    const API_BASE_URL = 'http://localhost:3000';
 
     // --- NAVIGATION & UI CONTROL ---
-
+    // (This section is unchanged)
     const showLogin = () => {
         loginOverlay.style.display = 'flex';
         appWrapper.classList.add('hidden');
     };
 
-    const showApp = async () => { // *** MODIFIED: Made async ***
+    const showApp = async () => {
         loginOverlay.style.display = 'none';
         appWrapper.classList.remove('hidden');
         
-        // Update user info in sidebar
-        const user = currentUser; // 'currentUser' is from core.js
+        const user = currentUser;
         document.getElementById('user-name').textContent = user.name;
         document.getElementById('user-role').textContent = user.role;
         document.getElementById('user-employee-id').textContent = user.employeeId;
 
-        // Show/hide nav links based on role
         navLinks.admin.style.display = permissionService.can('VIEW_ADMIN_PANEL') ? 'flex' : 'none';
         navLinks.ledger.style.display = permissionService.can('VIEW_LEDGER') ? 'flex' : 'none';
 
-        await loadBlockchain(); // *** MODIFIED: Await loadBlockchain ***
-        rebuildInventoryState(); // from core.js
+        await loadBlockchain();
+        rebuildInventoryState();
         navigateTo('dashboard');
     };
 
     const navigateTo = (view, context = {}) => {
-        appContent.innerHTML = ''; // Clear content
-        
-        // Remove 'active' class from all nav links
+        appContent.innerHTML = '';
         Object.values(navLinks).forEach(link => link.classList.remove('active'));
 
         let viewTemplate;
@@ -73,7 +72,7 @@ document.addEventListener('DOMContentLoaded', async () => { // *** MODIFIED: Mad
                 break;
             
             case 'detail':
-                navLinks.products.classList.add('active'); // Keep 'Products' active
+                navLinks.products.classList.add('active');
                 viewTemplate = templates.productDetail.content.cloneNode(true);
                 appContent.appendChild(viewTemplate);
                 renderProductDetail(context.productId);
@@ -84,7 +83,7 @@ document.addEventListener('DOMContentLoaded', async () => { // *** MODIFIED: Mad
                 navLinks.admin.classList.add('active');
                 viewTemplate = templates.admin.content.cloneNode(true);
                 appContent.appendChild(viewTemplate);
-                renderAdminPanel();
+                renderAdminPanel(); // *** MODIFIED: This is now async ***
                 break;
 
             case 'ledger':
@@ -106,15 +105,16 @@ document.addEventListener('DOMContentLoaded', async () => { // *** MODIFIED: Mad
     };
     
     // --- EVENT HANDLERS (Delegated & Static) ---
-
+    // (This section is mostly unchanged)
+    
     // Login/Logout
-    loginForm.addEventListener('submit', async (e) => { // *** MODIFIED: Made async ***
+    loginForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const email = loginEmailSelect.value;
         const password = document.getElementById('login-password').value;
-        await authService.login(email, password, showApp, showError); // *** MODIFIED: Await login ***
+        await authService.login(email, password, showApp, showError);
     });
-    logoutButton.addEventListener('click', () => authService.logout(showLogin)); // Pass UI function
+    logoutButton.addEventListener('click', () => authService.logout(showLogin));
 
     // Sidebar Navigation
     navLinks.dashboard.addEventListener('click', (e) => { e.preventDefault(); navigateTo('dashboard'); });
@@ -122,47 +122,44 @@ document.addEventListener('DOMContentLoaded', async () => { // *** MODIFIED: Mad
     navLinks.admin.addEventListener('click', (e) => { e.preventDefault(); navigateTo('admin'); });
     navLinks.ledger.addEventListener('click', (e) => { e.preventDefault(); navigateTo('ledger'); });
 
-    // Dynamic content events (delegated from appContent)
-    appContent.addEventListener('submit', async (e) => { // *** MODIFIED: Made async ***
+    // Dynamic content events
+    appContent.addEventListener('submit', async (e) => {
         e.preventDefault();
         
         if (e.target.id === 'add-item-form') {
             if (!permissionService.can('CREATE_ITEM')) return showError("Access Denied.");
-            await handleAddItem(e.target); // *** MODIFIED: Await handler ***
+            await handleAddItem(e.target);
         }
         
         if (e.target.id === 'update-stock-form') {
             if (!permissionService.can('UPDATE_STOCK')) return showError("Access Denied.");
-            await handleUpdateStock(e.target); // *** MODIFIED: Await handler ***
+            await handleUpdateStock(e.target);
         }
 
         if (e.target.id === 'move-stock-form') {
             if (!permissionService.can('UPDATE_STOCK')) return showError("Access Denied.");
-            await handleMoveStock(e.target); // *** MODIFIED: Await handler ***
+            await handleMoveStock(e.target);
         }
     });
 
     appContent.addEventListener('input', (e) => {
         if (e.target.id === 'product-search-input') {
-            renderProductList(); // Re-render the list on every keystroke
+            renderProductList();
         }
     });
 
-    appContent.addEventListener('click', async (e) => { // *** MODIFIED: Made async ***
-        // Back to list
+    appContent.addEventListener('click', async (e) => {
         if (e.target.closest('#back-to-list-button')) {
             navigateTo('products');
             return;
         }
         
-        // Dashboard View All Activity
         if (e.target.closest('#dashboard-view-ledger')) {
             e.preventDefault();
             navigateTo('ledger');
             return;
         }
 
-        // Product card click
         const productCard = e.target.closest('.product-card');
         if (productCard && productCard.dataset.productId) {
             navigateTo('detail', { productId: productCard.dataset.productId });
@@ -175,25 +172,27 @@ document.addEventListener('DOMContentLoaded', async () => { // *** MODIFIED: Mad
             return;
         }
 
-        // Admin buttons
         if (e.target.closest('#clear-db-button')) {
             if (!permissionService.can('CLEAR_DB')) return showError("Access Denied.");
-            await handleClearDb(); // *** MODIFIED: Await handler ***
+            await handleClearDb();
         }
         if (e.target.closest('#verify-chain-button')) {
             if (!permissionService.can('VERIFY_CHAIN')) return showError("Access Denied.");
-            await handleVerifyChain(); // *** MODIFIED: Await handler ***
+            await handleVerifyChain();
         }
-        // User role change
+        
+        // *** MODIFIED: This now calls handleRoleChange ***
         if (e.target.classList.contains('role-select')) {
             if (!permissionService.can('MANAGE_USERS')) return showError("Access Denied.");
-            await handleRoleChange(e.target.dataset.userId, e.target.value); // *** MODIFIED: Await handler ***
+            // Pass the user ID and the new role value
+            await handleRoleChange(e.target.dataset.userId, e.target.value);
         }
     });
 
     // --- FORM HANDLERS (UI LOGIC) ---
+    // (handleAddItem, handleUpdateStock, handleMoveStock are unchanged)
 
-    const handleAddItem = async (form) => { // *** MODIFIED: Made async ***
+    const handleAddItem = async (form) => {
         const itemSku = form.querySelector('#add-product-id').value;
         const itemName = form.querySelector('#add-product-name').value;
         const quantity = parseInt(form.querySelector('#add-quantity').value, 10);
@@ -207,7 +206,7 @@ document.addEventListener('DOMContentLoaded', async () => { // *** MODIFIED: Mad
 
         const beforeQuantity = 0;
         const afterQuantity = quantity;
-        const user = currentUser; // from core.js
+        const user = currentUser;
 
         const transaction = {
             txType: "CREATE_ITEM", itemSku, itemName, quantity,
@@ -218,8 +217,8 @@ document.addEventListener('DOMContentLoaded', async () => { // *** MODIFIED: Mad
             timestamp: new Date().toISOString()
         };
 
-        if (processTransaction(transaction, false, showError)) { // from core.js
-            await addTransactionToChain(transaction); // *** MODIFIED: Await addTransactionToChain ***
+        if (processTransaction(transaction, false, showError)) {
+            await addTransactionToChain(transaction);
             renderProductList();
             showSuccess(`Product ${itemName} added!`);
             form.reset();
@@ -229,7 +228,7 @@ document.addEventListener('DOMContentLoaded', async () => { // *** MODIFIED: Mad
         }
     };
 
-    const handleUpdateStock = async (form) => { // *** MODIFIED: Made async ***
+    const handleUpdateStock = async (form) => {
         const itemSku = document.getElementById('update-product-id').value;
         const quantity = parseInt(form.querySelector('#update-quantity').value, 10);
         const clickedButton = document.activeElement;
@@ -237,11 +236,11 @@ document.addEventListener('DOMContentLoaded', async () => { // *** MODIFIED: Mad
 
         if (!itemSku || !quantity || quantity <= 0) return showError("Please enter a valid quantity.");
         
-        const product = inventory.get(itemSku); // 'inventory' from core.js
+        const product = inventory.get(itemSku);
         let transaction = {};
         let success = false;
         let beforeQuantity, afterQuantity;
-        const user = currentUser; // from core.js
+        const user = currentUser;
 
         if (actionType === 'STOCK_IN') {
             const locationIn = form.querySelector('#update-location').value;
@@ -260,7 +259,7 @@ document.addEventListener('DOMContentLoaded', async () => { // *** MODIFIED: Mad
                 userName: user.name, 
                 timestamp: new Date().toISOString() 
             };
-            success = processTransaction(transaction, false, showError); // from core.js
+            success = processTransaction(transaction, false, showError);
         } else if (actionType === 'STOCK_OUT') {
             const locationOut = form.querySelector('#update-location').value;
             beforeQuantity = product.locations.get(locationOut) || 0;
@@ -278,18 +277,18 @@ document.addEventListener('DOMContentLoaded', async () => { // *** MODIFIED: Mad
                 userName: user.name, 
                 timestamp: new Date().toISOString() 
             };
-            success = processTransaction(transaction, false, showError); // from core.js
+            success = processTransaction(transaction, false, showError);
         }
 
         if (success) {
-            await addTransactionToChain(transaction); // *** MODIFIED: Await addTransactionToChain ***
-            renderProductDetail(itemSku); // Re-render this view
+            await addTransactionToChain(transaction);
+            renderProductDetail(itemSku);
             showSuccess(`Stock for ${itemSku} updated!`);
         }
     };
 
-    const handleMoveStock = async (form) => { // *** MODIFIED: Made async ***
-        const itemSku = document.getElementById('update-product-id').value; // Get SKU from hidden field
+    const handleMoveStock = async (form) => {
+        const itemSku = document.getElementById('update-product-id').value;
         const quantity = parseInt(form.querySelector('#move-quantity').value, 10);
         const fromLocation = form.querySelector('#move-from-location').value;
         const toLocation = form.querySelector('#move-to-location').value;
@@ -323,27 +322,34 @@ document.addEventListener('DOMContentLoaded', async () => { // *** MODIFIED: Mad
             timestamp: new Date().toISOString() 
         };
 
-        if (processTransaction(transaction, false, showError)) { // core.js handles the logic
-            await addTransactionToChain(transaction); // *** MODIFIED: Await addTransactionToChain ***
-            renderProductDetail(itemSku); // Re-render this view
+        if (processTransaction(transaction, false, showError)) {
+            await addTransactionToChain(transaction);
+            renderProductDetail(itemSku);
             showSuccess(`Moved ${quantity} units of ${itemSku} from ${fromLocation} to ${toLocation}.`);
         }
     };
 
-    const handleClearDb = async () => { // *** MODIFIED: Made async ***
-        localStorage.removeItem(DB_KEY);
-        localStorage.removeItem(USERS_KEY);
-        inventory.clear(); // from core.js
-        await loadBlockchain(); // *** MODIFIED: Await loadBlockchain ***
+    const handleClearDb = async () => {
+        localStorage.removeItem(DB_KEY); // *** MODIFIED: Only clear blockchain key ***
+        inventory.clear();
+        await loadBlockchain();
         
-        await authService.init(showApp, showLogin); // *** MODIFIED: Await authService.init ***
+        // *** MODIFIED: We re-run init. This will log us out if backend reset (which we didn't build) ***
+        // *** Or just refresh our state. ***
+        await authService.init(showApp, showLogin); 
         
         navigateTo('dashboard');
-        showSuccess("Database cleared and demo reset.");
+        showSuccess("Local blockchain cleared.");
+        
+        // *** MODIFIED: If authService.init failed, we'll be at the login screen.
+        // We should re-populate the dropdown.
+        if (!currentUser) {
+            await populateLoginDropdown();
+        }
     };
 
-    const handleVerifyChain = async () => { // *** MODIFIED: Made async ***
-        const isValid = await isChainValid(blockchain); // *** MODIFIED: Await isChainValid ***
+    const handleVerifyChain = async () => {
+        const isValid = await isChainValid(blockchain);
         if (isValid) {
             showSuccess("Verification complete: Blockchain is valid!");
         } else {
@@ -351,43 +357,60 @@ document.addEventListener('DOMContentLoaded', async () => { // *** MODIFIED: Mad
         }
     };
     
-    const handleRoleChange = async (userId, newRole) => { // *** MODIFIED: Made async ***
-        const user = usersDb.find(u => u.id === userId); // 'usersDb' from core.js
-        if (user) {
-            user.role = newRole;
-            localStorage.setItem(USERS_KEY, JSON.stringify(usersDb));
-            showSuccess(`Role for ${user.name} updated to ${newRole}.`);
-            
-            if (user.id === currentUser.id) { // 'currentUser' from core.js
-                currentUser.role = newRole;
-                localStorage.setItem(AUTH_KEY, JSON.stringify(currentUser));
-                await showApp(); // *** MODIFIED: Await showApp ***
+    /**
+     * *** MODIFIED: This function now calls the backend API to update a user's role. ***
+     */
+    const handleRoleChange = async (userId, newRole) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/users/${userId}/role`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include', // Essential for auth
+                body: JSON.stringify({ role: newRole })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.message || 'Failed to update role');
             }
+
+            showSuccess(`Role for ${data.user.name} updated to ${newRole}.`);
+
+            // If we updated ourselves, our permissions might have changed.
+            // Re-fetch our own user data and re-render the app
+            if (data.user.id === currentUser.id) {
+                currentUser = data.user; // Update current user
+                await showApp(); // Re-render the app with new permissions
+            }
+
+        } catch (error) {
+            showError(error.message);
+            // Re-render admin panel to revert the dropdown to its original state
+            renderAdminPanel();
         }
     };
 
     // --- VIEW RENDERING FUNCTIONS (UI LOGIC) ---
+    // (renderDashboard, renderProductList, renderProductDetail, renderItemHistory, renderFullLedger, createLedgerBlockElement are unchanged)
     
     const renderDashboard = () => {
-        // *** MODIFIED: Calculate Total Value and Total Units ***
         let totalUnits = 0;
         let totalValue = 0;
-        inventory.forEach(product => { // 'inventory' from core.js
+        inventory.forEach(product => {
             let totalStock = 0;
             product.locations.forEach(qty => totalStock += qty);
             totalUnits += totalStock;
             totalValue += (product.price || 0) * totalStock;
         });
 
-        // *** MODIFIED: Update new KPI elements ***
         appContent.querySelector('#kpi-total-value').textContent = `₹${totalValue.toFixed(2)}`;
         appContent.querySelector('#kpi-total-units').textContent = totalUnits;
-        appContent.querySelector('#kpi-transactions').textContent = blockchain.length; // 'blockchain' from core.js
+        appContent.querySelector('#kpi-transactions').textContent = blockchain.length;
         
         appContent.querySelector('#clear-db-button').style.display = permissionService.can('CLEAR_DB') ? 'flex' : 'none';
         appContent.querySelector('#verify-chain-button').style.display = permissionService.can('VERIFY_CHAIN') ? 'flex' : 'none';
         
-        // Render Recent Activity
         const activityContainer = appContent.querySelector('#recent-activity-container');
         if (activityContainer && permissionService.can('VIEW_LEDGER')) {
             const activityList = appContent.querySelector('#recent-activity-list');
@@ -397,7 +420,7 @@ document.addEventListener('DOMContentLoaded', async () => { // *** MODIFIED: Mad
             viewLedgerLink.style.display = 'block';
             activityList.innerHTML = '';
 
-            const recentBlocks = [...blockchain] // 'blockchain' from core.js
+            const recentBlocks = [...blockchain]
                 .reverse()
                 .filter(block => block.transaction.txType !== 'GENESIS')
                 .slice(0, 5);
@@ -414,7 +437,6 @@ document.addEventListener('DOMContentLoaded', async () => { // *** MODIFIED: Mad
             activityContainer.style.display = 'none';
         }
 
-        // Render Low Stock Items
         const lowStockContainer = appContent.querySelector('#low-stock-container');
         if (lowStockContainer && permissionService.can('VIEW_PRODUCTS')) {
             const lowStockList = appContent.querySelector('#low-stock-list');
@@ -444,7 +466,7 @@ document.addEventListener('DOMContentLoaded', async () => { // *** MODIFIED: Mad
             } else {
                 emptyMessage.style.display = 'none';
                 lowStockProducts
-                    .sort((a, b) => a.stock - b.stock) // Show lowest first
+                    .sort((a, b) => a.stock - b.stock)
                     .forEach(product => {
                         const itemElement = document.createElement('div');
                         itemElement.className = 'low-stock-item p-3 border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer';
@@ -484,7 +506,7 @@ document.addEventListener('DOMContentLoaded', async () => { // *** MODIFIED: Mad
             const sku = productId.toLowerCase();
 
             if (searchTerm && !productName.includes(searchTerm) && !sku.includes(searchTerm)) {
-                return; // Skip this product
+                return;
             }
             productsFound++;
 
@@ -521,7 +543,7 @@ document.addEventListener('DOMContentLoaded', async () => { // *** MODIFIED: Mad
     };
 
     const renderProductDetail = (productId) => {
-        const product = inventory.get(productId); // 'inventory' from core.js
+        const product = inventory.get(productId);
         if (!product) {
             showError(`Product ${productId} not found.`);
             return navigateTo('products');
@@ -529,7 +551,7 @@ document.addEventListener('DOMContentLoaded', async () => { // *** MODIFIED: Mad
 
         appContent.querySelector('#detail-product-name').textContent = product.productName;
         appContent.querySelector('#detail-product-id').textContent = productId;
-        appContent.querySelector('#update-product-id').value = productId; // Set hidden SKU field
+        appContent.querySelector('#update-product-id').value = productId;
 
         const price = product.price || 0;
         appContent.querySelector('#detail-product-price').textContent = `₹${price.toFixed(2)}`;
@@ -559,7 +581,7 @@ document.addEventListener('DOMContentLoaded', async () => { // *** MODIFIED: Mad
         const historyDisplay = appContent.querySelector('#item-history-display');
         historyDisplay.innerHTML = '';
         
-        const itemHistory = blockchain // 'blockchain' from core.js
+        const itemHistory = blockchain
             .filter(block => block.transaction.itemSku === productId)
             .reverse();
 
@@ -577,36 +599,55 @@ document.addEventListener('DOMContentLoaded', async () => { // *** MODIFIED: Mad
         const ledgerDisplay = appContent.querySelector('#full-ledger-display');
         ledgerDisplay.innerHTML = '';
         
-        [...blockchain].reverse().forEach(block => { // 'blockchain' from core.js
+        [...blockchain].reverse().forEach(block => {
             if (block.transaction.txType === 'GENESIS') return;
             ledgerDisplay.appendChild(createLedgerBlockElement(block));
         });
     };
     
-    const renderAdminPanel = () => {
+    /**
+     * *** MODIFIED: This function now fetches user data from the backend API. ***
+     */
+    const renderAdminPanel = async () => {
         const tableBody = appContent.querySelector('#user-management-table');
-        tableBody.innerHTML = '';
+        tableBody.innerHTML = '<tr><td colspan="4" class="table-cell text-center">Loading users...</td></tr>';
         
-        usersDb = JSON.parse(localStorage.getItem(USERS_KEY));
-        
-        usersDb.forEach(user => {
-            const row = document.createElement('tr');
-            const isCurrentUser = user.id === currentUser.id; // 'currentUser' from core.js
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/users`, {
+                credentials: 'include' // Essential for auth
+            });
             
-            row.innerHTML = `
-                <td class="table-cell font-medium">${user.name}</td>
-                <td class="table-cell text-slate-500">${user.employeeId}</td>
-                <td class="table-cell text-slate-500">${user.email}</td>
-                <td class="table-cell">
-                    <select data-user-id="${user.id}" class="role-select block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" ${isCurrentUser ? 'disabled' : ''}>
-                        <option value="Admin" ${user.role === 'Admin' ? 'selected' : ''}>Admin</option>
-                        <option value="Inventory Manager" ${user.role === 'Inventory Manager' ? 'selected' : ''}>Inventory Manager</option>
-                        <option value="Auditor" ${user.role === 'Auditor' ? 'selected' : ''}>Auditor</option>
-                    </select>
-                </td>
-            `;
-            tableBody.appendChild(row);
-        });
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.message || 'Failed to fetch users');
+            }
+            
+            const usersDb = await response.json();
+            tableBody.innerHTML = ''; // Clear loading message
+
+            usersDb.forEach(user => {
+                const row = document.createElement('tr');
+                const isCurrentUser = user.id === currentUser.id;
+                
+                row.innerHTML = `
+                    <td class="table-cell font-medium">${user.name}</td>
+                    <td class="table-cell text-slate-500">${user.employeeId}</td>
+                    <td class="table-cell text-slate-500">${user.email}</td>
+                    <td class="table-cell">
+                        <select data-user-id="${user.id}" class="role-select block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" ${isCurrentUser ? 'disabled' : ''}>
+                            <option value="Admin" ${user.role === 'Admin' ? 'selected' : ''}>Admin</option>
+                            <option value="Inventory Manager" ${user.role === 'Inventory Manager' ? 'selected' : ''}>Inventory Manager</option>
+                            <option value="Auditor" ${user.role === 'Auditor' ? 'selected' : ''}>Auditor</option>
+                        </select>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+
+        } catch (error) {
+            showError(error.message);
+            tableBody.innerHTML = `<tr><td colspan="4" class="table-cell text-center text-red-600">Error loading users.</td></tr>`;
+        }
     };
 
     /**
@@ -663,6 +704,7 @@ document.addEventListener('DOMContentLoaded', async () => { // *** MODIFIED: Mad
     };
     
     // --- TOAST/NOTIFICATION FUNCTIONS (UI LOGIC) ---
+    // (This section is unchanged)
     
     let errorTimer;
     const showError = (message, suppress = false) => {
@@ -683,16 +725,47 @@ document.addEventListener('DOMContentLoaded', async () => { // *** MODIFIED: Mad
         successTimer = setTimeout(() => successToast.classList.remove('toast-show'), 3000);
     };
 
+    /**
+     * *** NEW HELPER FUNCTION ***
+     * Fetches users from the backend and populates the login dropdown.
+     */
+    const populateLoginDropdown = async () => {
+        try {
+            // This fetch call does not need 'credentials' if we make the endpoint public
+            const response = await fetch(`${API_BASE_URL}/api/users`);
+            if (!response.ok) {
+                const err = await response.json();
+                // We add this check because the server will send 'Not authenticated'
+                // if we forget to make the endpoint public.
+                if (err.message === 'Not authenticated') {
+                    throw new Error('Failed to fetch users. (Hint: Make GET /api/users public on server.js)');
+                }
+                throw new Error(err.message || 'Failed to fetch users');
+            }
+            
+            const users = await response.json();
+            
+            loginEmailSelect.innerHTML = ''; // Clear any existing options
+            users.forEach(user => {
+                const option = document.createElement('option');
+                option.value = user.email;
+                option.textContent = `${user.name} (${user.role})`;
+                loginEmailSelect.appendChild(option);
+            });
+        
+        } catch (error) {
+            console.error(error.message);
+            showError(error.message);
+            loginEmailSelect.innerHTML = '<option value="">Could not load users</option>';
+        }
+    };
+
+
     // --- INITIALIZATION ---
     
-    // Populate login dropdown (UI logic)
-    MOCK_USERS.forEach(user => { // 'MOCK_USERS' from config.js
-        const option = document.createElement('option');
-        option.value = user.email;
-        option.textContent = `${user.name} (${user.role})`;
-        loginEmailSelect.appendChild(option);
-    });
+    // *** MODIFIED: Populate login dropdown from the new backend API ***
+    await populateLoginDropdown();
 
-    // Start the app by calling the auth service
-    await authService.init(showApp, showLogin); // *** MODIFIED: Await authService.init ***
+    // Start the app by checking for a server session
+    await authService.init(showApp, showLogin);
 });
