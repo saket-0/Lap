@@ -118,6 +118,8 @@
                     </div>
                 <p id="recent-activity-empty" class="text-sm text-slate-500" style="display: none;">No transactions found.</p>
             </div>
+
+
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div class="bg-white p-6 rounded-lg shadow-md">
                     <h2 class="text-2xl font-semibold mb-4 text-slate-800">Database Options</h2>
@@ -146,26 +148,26 @@
                 <p class="text-sm text-slate-500 mb-4">Add a new product (SKU) to the inventory system. Initial stock will be added to the 'Supplier'.</p>
                 
                 <form id="add-item-form" class="space-y-4">
-                    <div class="grid grid-cols-1 md:grid-cols-6 gap-4">
+                    <div class="grid grid-cols-1 md:grid-cols-6 gap-6">
                         <div class="md:col-span-3">
                             <label for="add-product-id" class="block text-sm font-medium text-slate-700">Product ID (SKU)</label>
-                            <input type="text" id="add-product-id" value="SKU-101" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" required>
+                            <input type="text" id="add-product-id" value="SKU-101" class="form-input-underline" required>
                         </div>
                         <div class="md:col-span-3">
                             <label for="add-product-name" class="block text-sm font-medium text-slate-700">Product Name</label>
-                            <input type="text" id="add-product-name" value="Smart Watch" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" required>
+                            <input type="text" id="add-product-name" value="Smart Watch" class="form-input-underline" required>
                         </div>
                         <div class="md:col-span-2">
                             <label for="add-quantity" class="block text-sm font-medium text-slate-700">Initial Quantity</label>
-                            <input type="number" id="add-quantity" value="100" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" required>
+                            <input type="number" id="add-quantity" value="100" class="form-input-underline" required>
                         </div>
                         <div class="md:col-span-2">
                             <label for="add-price" class="block text-sm font-medium text-slate-700">Initial Price (₹)</label>
-                            <input type="number" id="add-price" value="199.99" step="0.01" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" required>
+                            <input type="number" id="add-price" value="199.99" step="0.01" class="form-input-underline" required>
                         </div>
                         <div class="md:col-span-2">
                             <label for="add-to" class="block text-sm font-medium text-slate-700">Add to Location</label>
-                            <select id="add-to" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            <select id="add-to" class="form-select-underline">
                                 <option>Supplier</option>
                                 <option>Warehouse</option>
                             </select>
@@ -176,7 +178,7 @@
                         Add Product
                     </button>
                 </form>
-            </div>
+                </div>
 
             <div>
                 <h2 class="text-3xl font-semibold mb-4 text-slate-800">Product Inventory</h2>

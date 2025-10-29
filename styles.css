@@ -126,3 +126,50 @@ input::-webkit-inner-spin-button {
 input[type=number] {
   -moz-appearance: textfield;
 }
+
+/* *** NEW: Underlined form inputs *** */
+.form-input-underline {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    --tw-ring-shadow: 0 0 #0000;
+    border-bottom: 2px solid #cbd5e1; /* slate-300 */
+    display: block;
+    width: 100%;
+    margin-top: 0.25rem;
+    /* *** MODIFIED: Reduced vertical padding *** */
+    padding: 0.25rem 0.1rem;
+    background-color: transparent;
+}
+.form-input-underline:focus {
+    outline: none;
+    border-bottom-color: #4f46e5; /* indigo-600 */
+}
+.form-select-underline {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    --tw-ring-shadow: 0 0 #0000;
+    border-bottom: 2px solid #cbd5e1; /* slate-300 */
+    display: block;
+    width: 100%;
+    margin-top: 0.25rem;
+    /* *** MODIFIED: Reduced vertical padding *** */
+    padding: 0.25rem 0.1rem;
+    background-color: transparent;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+    background-position: right 0.5rem center;
+    background-repeat: no-repeat;
+    background-size: 1.5em 1.5em;
+    padding-right: 2.5rem;
+}
+.form-select-underline:focus {
+    outline: none;
+    border-bottom-color: #4f46e5; /* indigo-600 */
+}
