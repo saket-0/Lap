@@ -114,3 +114,15 @@ body {
     color: #1e293b; /* slate-800 */
     white-space: nowrap;
 }
+
+/* *** NEW: Hide number input spinners *** */
+/* For Chrome, Safari, Edge, Opera */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+/* For Firefox */
+input[type=number] {
+  -moz-appearance: textfield;
+}

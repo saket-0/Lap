@@ -453,8 +453,8 @@ document.addEventListener('DOMContentLoaded', () => {
         appContent.querySelector('#update-product-id').value = productId; // Set hidden SKU field
 
         // *** MODIFIED: Display price ***
-        const price = product.price || 0;
-        appContent.querySelector('#detail-product-price').textContent = `$${price.toFixed(2)}`;
+    const price = product.price || 0;
+    appContent.querySelector('#detail-product-price').textContent = `₹${price.toFixed(2)}`;
 
 
         const stockLevelsDiv = appContent.querySelector('#detail-stock-levels');
@@ -549,7 +549,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 transactionHtml = `<span class="font-semibold text-green-700">CREATE</span> <strong>${quantity}</strong> of <strong>${itemName}</strong> (${itemSku}) to <strong>${toLocation}</strong>`;
                 // *** MODIFIED: Add price to details ***
                 detailsHtml = `<li>User: <strong>${userName}</strong> (${employeeId})</li>
-                               <li>Price: <strong>$${(price || 0).toFixed(2)}</strong></li>`;
+                               <li>Price: <strong>₹${(price || 0).toFixed(2)}</strong></li>`;
                 break;
             case 'MOVE':
                 transactionHtml = `<span class="font-semibold text-blue-600">MOVE</span> <strong>${quantity}</strong> of <strong>${itemSku}</strong>`;
