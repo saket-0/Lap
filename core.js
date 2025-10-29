@@ -232,3 +232,11 @@ const rebuildInventoryState = () => {
         }
     }
 };
+
+// Expose key globals for module-based frontend (modules can't see top-level const/let)
+window.authService = authService;
+window.permissionService = permissionService;
+window.currentUser = currentUser;
+window.loadBlockchain = loadBlockchain;
+window.rebuildInventoryState = rebuildInventoryState;
+window.API_BASE_URL = API_BASE_URL;
