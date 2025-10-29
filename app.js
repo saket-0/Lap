@@ -136,14 +136,12 @@ document.addEventListener('DOMContentLoaded', () => {
             handleUpdateStock(e.target);
         }
 
-        // *** NEW: Handle Move Stock Form ***
         if (e.target.id === 'move-stock-form') {
             if (!permissionService.can('UPDATE_STOCK')) return showError("Access Denied.");
             handleMoveStock(e.target);
         }
     });
 
-    // *** NEW: Listen for 'input' events for the search bar ***
     appContent.addEventListener('input', (e) => {
         if (e.target.id === 'product-search-input') {
             renderProductList(); // Re-render the list on every keystroke
@@ -171,7 +169,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // *** NEW: Low stock item click ***
         const lowStockItem = e.target.closest('.low-stock-item');
         if (lowStockItem && lowStockItem.dataset.productId) {
             navigateTo('detail', { productId: lowStockItem.dataset.productId });
@@ -201,7 +198,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const itemName = form.querySelector('#add-product-name').value;
         const quantity = parseInt(form.querySelector('#add-quantity').value, 10);
         const toLocation = form.querySelector('#add-to').value;
-        // *** MODIFIED: Read price and new category field ***
         const price = parseFloat(form.querySelector('#add-price').value);
         const category = form.querySelector('#add-product-category').value;
 
@@ -215,8 +211,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const transaction = {
             txType: "CREATE_ITEM", itemSku, itemName, quantity,
-            price, // *** MODIFIED: Add price to transaction ***
-            category, // *** NEW: Add category to transaction ***
+            price,
+            category,
             beforeQuantity, afterQuantity, toLocation,
             userId: user.id, employeeId: user.employeeId, userName: user.name,
             timestamp: new Date().toISOString()
@@ -234,10 +230,8 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const handleUpdateStock = (form) => {
-        // *** MODIFIED: Find product ID from the *other* form (since it's shared) ***
         const itemSku = document.getElementById('update-product-id').value;
         const quantity = parseInt(form.querySelector('#update-quantity').value, 10);
-        // Get which button was clicked using the event target
         const clickedButton = document.activeElement;
         const actionType = clickedButton.id === 'stock-in-button' ? 'STOCK_IN' : 'STOCK_OUT';
 
@@ -294,7 +288,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // *** NEW FUNCTION: handleMoveStock ***
     const handleMoveStock = (form) => {
         const itemSku = document.getElementById('update-product-id').value; // Get SKU from hidden field
         const quantity = parseInt(form.querySelector('#move-quantity').value, 10);
@@ -311,7 +304,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const product = inventory.get(itemSku);
         const user = currentUser;
 
-        // Calculate before/after quantities for the ledger
         const beforeFromQty = product.locations.get(fromLocation) || 0;
         const beforeToQty = product.locations.get(toLocation) || 0;
         const afterFromQty = beforeFromQty - quantity;
@@ -344,9 +336,6 @@ document.addEventListener('DOMContentLoaded', () => {
         inventory.clear(); // from core.js
         loadBlockchain(); // from core.js
         
-        // Re-init auth service (which lives in core.js)
-        // This is a bit of a workaround for the UI functions
-        // We are effectively logging out and back in
         authService.init(showApp, showLogin);
         
         navigateTo('dashboard');
@@ -380,15 +369,20 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- VIEW RENDERING FUNCTIONS (UI LOGIC) ---
     
     const renderDashboard = () => {
-        let totalSkus = inventory.size; // 'inventory' from core.js
+        // *** MODIFIED: Calculate Total Value and Total Units ***
         let totalUnits = 0;
-        inventory.forEach(product => {
-            product.locations.forEach(qty => totalUnits += qty);
+        let totalValue = 0;
+        inventory.forEach(product => { // 'inventory' from core.js
+            let totalStock = 0;
+            product.locations.forEach(qty => totalStock += qty);
+            totalUnits += totalStock;
+            totalValue += (product.price || 0) * totalStock;
         });
 
-        appContent.querySelector('#kpi-total-skus').textContent = totalSkus;
+        // *** MODIFIED: Update new KPI elements ***
+        appContent.querySelector('#kpi-total-value').textContent = `₹${totalValue.toFixed(2)}`;
         appContent.querySelector('#kpi-total-units').textContent = totalUnits;
-        appContent.querySelector('#kpi-chain-length').textContent = blockchain.length; // 'blockchain' from core.js
+        appContent.querySelector('#kpi-transactions').textContent = blockchain.length; // 'blockchain' from core.js
         
         appContent.querySelector('#clear-db-button').style.display = permissionService.can('CLEAR_DB') ? 'flex' : 'none';
         appContent.querySelector('#verify-chain-button').style.display = permissionService.can('VERIFY_CHAIN') ? 'flex' : 'none';
@@ -420,7 +414,7 @@ document.addEventListener('DOMContentLoaded', () => {
             activityContainer.style.display = 'none';
         }
 
-        // *** NEW: Render Low Stock Items ***
+        // Render Low Stock Items
         const lowStockContainer = appContent.querySelector('#low-stock-container');
         if (lowStockContainer && permissionService.can('VIEW_PRODUCTS')) {
             const lowStockList = appContent.querySelector('#low-stock-list');
@@ -476,7 +470,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const productGrid = appContent.querySelector('#product-grid');
         if (!productGrid) return;
         
-        // *** NEW: Get search term ***
         const searchInput = appContent.querySelector('#product-search-input');
         const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
 
@@ -490,7 +483,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const productName = product.productName.toLowerCase();
             const sku = productId.toLowerCase();
 
-            // *** NEW: Apply search filter ***
             if (searchTerm && !productName.includes(searchTerm) && !sku.includes(searchTerm)) {
                 return; // Skip this product
             }
@@ -503,7 +495,6 @@ document.addEventListener('DOMContentLoaded', () => {
             let totalStock = 0;
             product.locations.forEach(qty => totalStock += qty);
 
-            // *** MODIFIED: Added Category display ***
             productCard.innerHTML = `
                 <div class="product-card-placeholder"><i class="ph-bold ph-package"></i></div>
                 <div class="product-card-content">
@@ -520,7 +511,6 @@ document.addEventListener('DOMContentLoaded', () => {
             productGrid.appendChild(productCard);
         });
 
-        // *** NEW: Show message if no products are found ***
         if (productsFound === 0) {
             if (inventory.size === 0) {
                 productGrid.innerHTML = `<p class="text-slate-500 lg:col-span-3">No products in inventory. ${permissionService.can('CREATE_ITEM') ? 'Add one above!' : ''}</p>`;
@@ -541,7 +531,6 @@ document.addEventListener('DOMContentLoaded', () => {
         appContent.querySelector('#detail-product-id').textContent = productId;
         appContent.querySelector('#update-product-id').value = productId; // Set hidden SKU field
 
-        // *** MODIFIED: Display price and category ***
         const price = product.price || 0;
         appContent.querySelector('#detail-product-price').textContent = `₹${price.toFixed(2)}`;
         appContent.querySelector('#detail-product-category').textContent = product.category || 'Uncategorized';
@@ -564,8 +553,6 @@ document.addEventListener('DOMContentLoaded', () => {
         appContent.querySelector('#update-stock-container').style.display = permissionService.can('UPDATE_STOCK') ? 'block' : 'none';
 
         renderItemHistory(productId);
-        
-        // *** MODIFIED: Removed dead code that was here ***
     };
 
     const renderItemHistory = (productId) => {
@@ -629,7 +616,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const blockElement = document.createElement('div');
         blockElement.className = 'border border-slate-200 rounded-lg p-3 bg-white shadow-sm';
         
-        // *** MODIFIED: Destructure 'price' and 'category' ***
         const { txType, itemSku, itemName, quantity, fromLocation, toLocation, location, userName, employeeId, beforeQuantity, afterQuantity, price, category } = block.transaction;
         let transactionHtml = '';
         let detailsHtml = '';
@@ -637,7 +623,6 @@ document.addEventListener('DOMContentLoaded', () => {
         switch (txType) {
             case 'CREATE_ITEM':
                 transactionHtml = `<span class="font-semibold text-green-700">CREATE</span> <strong>${quantity}</strong> of <strong>${itemName}</strong> (${itemSku}) to <strong>${toLocation}</strong>`;
-                // *** MODIFIED: Add price and category to details ***
                 detailsHtml = `<li>User: <strong>${userName}</strong> (${employeeId})</li>
                                <li>Price: <strong>₹${(price || 0).toFixed(2)}</strong></li>
                                <li>Category: <strong>${category || 'N/A'}</strong></li>`;
