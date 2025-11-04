@@ -1,10 +1,18 @@
-// server.js
+// Lap/bims-backend/server.js
 const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 const session = require('express-session');
 const PgSession = require('connect-pg-simple')(session);
+
+// --- NEW: Import blockchain utilities ---
+const { 
+    createBlock, 
+    createGenesisBlock, 
+    isChainValid,
+    validateTransaction 
+} = require('./chain-utils');
 
 const app = express();
 const port = 3000;
@@ -18,13 +26,12 @@ const pool = new Pool({
     port: 5432,
 });
 
-// CRITICAL: Set trust proxy - this helps Express understand it's behind a proxy
+// CRITICAL: Set trust proxy
 app.set('trust proxy', 1);
 
-// --- 2. CORS Setup (MUST come before other middleware) ---
+// --- 2. CORS Setup ---
 app.use(cors({
     origin: function(origin, callback) {
-        // Allow requests with no origin (mobile apps, Postman, etc.)
         const allowedOrigins = [
             'http://127.0.0.1:5500', 
             'http://localhost:5500', 
@@ -38,16 +45,16 @@ app.use(cors({
             callback(new Error('Not allowed by CORS'));
         }
     },
-    credentials: true, // CRITICAL: Allow cookies
+    credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     exposedHeaders: ['set-cookie']
 }));
 
-// --- 3. Body Parser (MUST come after CORS, before routes) ---
+// --- 3. Body Parser ---
 app.use(express.json());
 
-// --- 4. Session Setup (MUST come after body parser, before routes) ---
+// --- 4. Session Setup ---
 app.use(session({
     store: new PgSession({
         pool: pool,
@@ -56,17 +63,17 @@ app.use(session({
     secret: 'your_very_strong_secret_key_here',
     resave: false,
     saveUninitialized: false,
-    proxy: true, // CRITICAL: Trust the proxy
+    proxy: true,
     cookie: {
-        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+        maxAge: 30 * 24 * 60 * 60 * 1000,
         httpOnly: true,
-        secure: false, // FALSE for HTTP (local dev)
-        sameSite: 'lax', // Changed from 'strict' to 'lax'
+        secure: false,
+        sameSite: 'lax',
         path: '/',
-        domain: undefined // Let the browser set it automatically
+        domain: undefined
     },
     name: 'bims.sid',
-    rolling: true // Reset cookie expiration on every response
+    rolling: true
 }));
 
 // Debug middleware to log every request
@@ -93,7 +100,7 @@ const isAuthenticated = (req, res, next) => {
     }
 };
 
-// --- 5. API Endpoints ---
+// --- 5. API Endpoints (Auth & Users) ---
 
 // POST /api/auth/login
 app.post('/api/auth/login', async (req, res) => {
@@ -115,7 +122,6 @@ app.post('/api/auth/login', async (req, res) => {
             return res.status(400).json({ message: 'Invalid password' });
         }
         
-        // Don't store hash in session
         const userForSession = {
             id: user.id,
             employee_id: user.employee_id,
@@ -124,10 +130,8 @@ app.post('/api/auth/login', async (req, res) => {
             role: user.role
         };
         
-        // Save user to session
         req.session.user = userForSession;
         
-        // Force session save before sending response
         req.session.save((err) => {
             if (err) {
                 console.error('❌ Session save error:', err);
@@ -261,7 +265,136 @@ app.post('/api/users', isAuthenticated, async (req, res) => {
     }
 });
 
-// --- 6. Start Server ---
+
+// --- 6. NEW: Blockchain Endpoints ---
+
+// Helper function to get or create the Genesis block
+async function getGenesisBlock() {
+    let result = await pool.query('SELECT * FROM blockchain WHERE index = 0');
+    if (result.rows.length === 0) {
+        console.log('🌱 No Genesis block found. Creating one...');
+        const genesisBlock = await createGenesisBlock();
+        await pool.query(
+            'INSERT INTO blockchain (index, timestamp, transaction, previous_hash, hash) VALUES ($1, $2, $3, $4, $5)',
+            [genesisBlock.index, genesisBlock.timestamp, genesisBlock.transaction, genesisBlock.previousHash, genesisBlock.hash]
+        );
+        console.log('🌱 Genesis block created.');
+        return genesisBlock;
+    }
+    return result.rows[0];
+}
+
+// GET /api/blockchain - Fetches the entire blockchain
+app.get('/api/blockchain', isAuthenticated, async (req, res) => {
+    console.log('🔗 Fetching entire blockchain');
+    try {
+        await getGenesisBlock(); // Ensure Genesis block exists
+        const result = await pool.query('SELECT * FROM blockchain ORDER BY index ASC');
+        res.status(200).json(result.rows);
+    } catch (e) {
+        console.error('❌ Error fetching blockchain:', e);
+        res.status(500).json({ message: e.message });
+    }
+});
+
+// POST /api/blockchain - Adds a new transaction (and creates a block)
+app.post('/api/blockchain', isAuthenticated, async (req, res) => {
+    console.log('📦 Adding new block');
+    const transaction = req.body;
+    
+    // Add user details from session to the transaction
+    transaction.userId = req.session.user.id;
+    transaction.userName = req.session.user.name;
+    transaction.employeeId = req.session.user.employee_id;
+    transaction.timestamp = new Date().toISOString();
+
+    try {
+        // 1. Get the current chain from DB
+        const chainResult = await pool.query('SELECT * FROM blockchain ORDER BY index ASC');
+        const currentChain = chainResult.rows;
+
+        // 2. SERVER-SIDE VALIDATION:
+        console.log('🔬 Validating transaction...');
+        const { success, error } = validateTransaction(transaction, currentChain);
+        if (!success) {
+            console.log('❌ Validation failed:', error);
+            return res.status(400).json({ message: error });
+        }
+        console.log('✅ Transaction is valid.');
+
+        // 3. Get the last block
+        const lastBlock = currentChain[currentChain.length - 1];
+
+        // 4. Create the new block
+        const newIndex = lastBlock.index + 1;
+        const newBlock = await createBlock(newIndex, transaction, lastBlock.hash);
+
+        // 5. Insert the new block
+        await pool.query(
+            'INSERT INTO blockchain (index, timestamp, transaction, previous_hash, hash) VALUES ($1, $2, $3, $4, $5)',
+            [newBlock.index, newBlock.timestamp, newBlock.transaction, newBlock.previousHash, newBlock.hash]
+        );
+        
+        console.log(`✅ Block ${newBlock.index} added to chain.`);
+        res.status(201).json(newBlock); // Send the new block back to the client
+
+    } catch (e) {
+        console.error('❌ Error adding block:', e);
+        res.status(500).json({ message: e.message });
+    }
+});
+
+// GET /api/blockchain/verify - Verifies chain integrity
+app.get('/api/blockchain/verify', isAuthenticated, async (req, res) => {
+    console.log('🛡️ Verifying chain integrity...');
+    if (req.session.user.role !== 'Admin' && req.session.user.role !== 'Auditor') {
+        return res.status(403).json({ message: 'Forbidden: Admin or Auditor access required' });
+    }
+
+    try {
+        const result = await pool.query('SELECT * FROM blockchain ORDER BY index ASC');
+        const blocks = result.rows;
+        
+        const isValid = await isChainValid(blocks);
+        
+        if (isValid) {
+            console.log('✅ Chain is valid.');
+            res.status(200).json({ isValid: true, message: 'Blockchain integrity verified.' });
+        } else {
+            console.log('❌ CHAIN IS INVALID!');
+            res.status(500).json({ isValid: false, message: 'CRITICAL: Chain has been tampered with!' });
+        }
+    } catch (e) {
+        console.error('❌ Error verifying chain:', e);
+        res.status(500).json({ message: e.message });
+    }
+});
+
+// DELETE /api/blockchain - Clears the chain (Admin only)
+app.delete('/api/blockchain', isAuthenticated, async (req, res) => {
+    console.log('🗑️ Clearing blockchain');
+    if (req.session.user.role !== 'Admin') {
+        console.log('❌ Forbidden: Not an admin');
+        return res.status(403).json({ message: 'Forbidden: Admin access required' });
+    }
+    
+    try {
+        // Delete all blocks *except* the Genesis block (index 0)
+        await pool.query('DELETE FROM blockchain WHERE index > 0');
+        console.log('✅ Chain cleared (except Genesis).');
+        
+        // Fetch and return the remaining Genesis block
+        const result = await pool.query('SELECT * FROM blockchain WHERE index = 0');
+        res.status(200).json({ message: 'Blockchain cleared', chain: result.rows });
+        
+    } catch (e) {
+        console.error('❌ Error clearing chain:', e);
+        res.status(500).json({ message: e.message });
+    }
+});
+
+
+// --- 7. Start Server ---
 app.listen(port, '127.0.0.1', () => {
     console.log('\n=================================');
     console.log('🚀 BIMS Server Started');

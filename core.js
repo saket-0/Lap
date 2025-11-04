@@ -1,23 +1,22 @@
+// Lap/core.js
+
 // --- STATE MANAGEMENT ---
 let blockchain = [];
 let inventory = new Map(); // The "World State"
 let currentUser = null;
-// let usersDb = []; // *** MODIFIED: This is no longer needed; it's managed by the backend.
 
-// *** MODIFIED: Define the base URL for your backend server ***
-// const API_BASE_URL = 'http://localhost:3000';
+// Define the base URL for your backend server
 const API_BASE_URL = 'http://127.0.0.1:3000';
 
 // --- SERVICES (Simulating Backend Logic) ---
 
 /**
- * Authentication Service (Mock)
- * Note: It takes UI functions as parameters (dependency injection)
- * so this core file doesn't need to know about the DOM.
+ * Authentication Service
+ * Communicates with the backend.
  */
 const authService = {
     /**
-     * *** MODIFIED: Checks for an existing server-side session. ***
+     * Checks for an existing server-side session.
      */
     init: async (showAppCallback, showLoginCallback) => {
         try {
@@ -41,14 +40,14 @@ const authService = {
     },
     
     /**
-     * *** MODIFIED: Logs in by sending credentials to the backend. ***
+     * Logs in by sending credentials to the backend.
      */
     login: async (email, password, showAppCallback, showErrorCallback) => {
         try {
             const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                credentials: 'include', // This is essential for session cookies
+                credentials: 'include',
                 body: JSON.stringify({ email, password })
             });
 
@@ -67,27 +66,27 @@ const authService = {
     },
 
     /**
-     * *** MODIFIED: Logs out by invalidating the server session. ***
+     * Logs out by invalidating the server session.
      */
-    logout: async (showLoginCallback) => { // *** Made async ***
+    logout: async (showLoginCallback) => {
         try {
             // Tell the server to destroy the session
             await fetch(`${API_BASE_URL}/api/auth/logout`, {
                 method: 'POST',
-                credentials: 'include' // This is essential for session cookies
+                credentials: 'include'
             });
         } catch (error) {
             console.error('Error logging out:', error);
         } finally {
             currentUser = null;
-            // localStorage.removeItem(AUTH_KEY); // *** MODIFIED: This is no longer needed ***
             showLoginCallback();
         }
     }
 };
 
 /**
- * Permission Service (Mock)
+ * Permission Service
+ * Checks permissions based on the currentUser object.
  */
 const permissionService = {
     can: (action) => {
@@ -122,16 +121,41 @@ const permissionService = {
 };
 
 // --- CORE LOGIC (Blockchain & Inventory) ---
-// (This section remains unchanged as blockchain is still local)
 
+/**
+ * MODIFIED: Sends the transaction to the server, which creates the block.
+ * The server returns the new block, which we add to our local state.
+ * Throws an error if the server rejects the transaction.
+ */
 const addTransactionToChain = async (transaction) => {
-    const index = blockchain.length;
-    const previousHash = blockchain[blockchain.length - 1].hash;
-    const newBlock = await createBlock(index, transaction, previousHash);
+    // This function no longer creates a block.
+    // It sends the transaction to the server, which creates the block.
+    
+    const response = await fetch(`${API_BASE_URL}/api/blockchain`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include', // Send session cookie
+        body: JSON.stringify(transaction) // Send just the transaction data
+    });
+
+    if (!response.ok) {
+        const err = await response.json();
+        // Throw an error to be caught by the UI handler
+        throw new Error(err.message || 'Server failed to add transaction.');
+    }
+    
+    const newBlock = await response.json(); // Server returns the new, valid block
     blockchain.push(newBlock);
-    saveBlockchain();
+    
+    // No need to call saveBlockchain()!
 };
 
+
+/**
+ * UNCHANGED: This logic is still needed on the client-side for two reasons:
+ * 1. To run a "pre-check" in the UI before sending to the server.
+ * 2. To run inside rebuildInventoryState() to build the local inventory map.
+ */
 const processTransaction = (transaction, suppressErrors = false, showErrorCallback) => {
     const { txType, itemSku, itemName, quantity, fromLocation, toLocation, location, price, category } = transaction;
 
@@ -197,39 +221,53 @@ const processTransaction = (transaction, suppressErrors = false, showErrorCallba
 };
 
 // --- INITIALIZATION & DB HELPERS ---
-// (This section remains unchanged)
 
-const saveBlockchain = () => {
-    try {
-        localStorage.setItem(DB_KEY, JSON.stringify(blockchain));
-    } catch (e) {
-        console.error("Failed to save blockchain:", e);
-    }
-};
+/**
+ * REMOVED: saveBlockchain() is no longer needed.
+ */
+// const saveBlockchain = () => { ... }
 
+/**
+ * MODIFIED: Loads the blockchain from the server API.
+ */
 const loadBlockchain = async () => {
-    const savedChain = localStorage.getItem(DB_KEY);
-    if (savedChain) {
-        try {
-            blockchain = JSON.parse(savedChain);
-            if (blockchain.length === 0) throw new Error("Empty chain");
-        } catch (e) {
-            console.error("Failed to parse saved blockchain:", e);
-            localStorage.removeItem(DB_KEY);
-            blockchain = [await createGenesisBlock()];
-            saveBlockchain();
+    try {
+        console.log('Fetching blockchain from server...');
+        const response = await fetch(`${API_BASE_URL}/api/blockchain`, {
+            credentials: 'include' // Send session cookie
+        });
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.message || 'Failed to fetch blockchain from server.');
         }
-    } else {
-        blockchain = [await createGenesisBlock()];
-        saveBlockchain();
+        blockchain = await response.json();
+        
+        if (blockchain.length === 0) {
+            // This case should not happen if server logic is correct
+            throw new Error('Server returned an empty blockchain.');
+        }
+        console.log(`Blockchain loaded. ${blockchain.length} blocks found.`);
+    } catch (e) {
+        console.error("Failed to load blockchain:", e);
+        // This is a critical failure. We must stop the app.
+        alert(`CRITICAL ERROR: Could not load blockchain from server. ${e.message}. Logging out.`);
+        authService.logout(() => {
+            document.getElementById('login-overlay').style.display = 'flex';
+            document.getElementById('app-wrapper').classList.add('hidden');
+        });
     }
 };
 
+/**
+ * UNCHANGED: This is still needed to build the client-side inventory state
+ * after the blockchain is loaded from the server.
+ */
 const rebuildInventoryState = () => {
     inventory.clear();
-    for (let i = 1; i < blockchain.length; i++) {
+    for (let i = 1; i < blockchain.length; i++) { // Skip Genesis
         if (blockchain[i] && blockchain[i].transaction) {
-            processTransaction(blockchain[i].transaction, true, null); // Suppress errors on rebuild
+            // Suppress errors on rebuild, as the server has already validated
+            processTransaction(blockchain[i].transaction, true, null); 
         }
     }
 };

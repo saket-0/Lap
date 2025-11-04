@@ -1,19 +1,18 @@
+// Lap/app.js
 document.addEventListener('DOMContentLoaded', async () => {
     
     // --- DOM ELEMENTS ---
     const loginOverlay = document.getElementById('login-overlay');
     const loginForm = document.getElementById('login-form');
     
-    // *** MODIFIED: Get new login elements ***
-    const loginEmailInput = document.getElementById('login-email-input'); // The text input
-    const loginEmailSelect = document.getElementById('login-email-select'); // The dropdown
-    const quickLoginButton = document.getElementById('quick-login-button'); // The new button
+    const loginEmailInput = document.getElementById('login-email-input');
+    const loginEmailSelect = document.getElementById('login-email-select');
+    const quickLoginButton = document.getElementById('quick-login-button');
     
     const appWrapper = document.getElementById('app-wrapper');
     const appContent = document.getElementById('app-content');
     const logoutButton = document.getElementById('logout-button');
     
-    // (Rest of the DOM elements are the same)
     const navLinks = {
         dashboard: document.getElementById('nav-dashboard'),
         products: document.getElementById('nav-products'),
@@ -32,11 +31,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         ledger: document.getElementById('ledger-view-template'),
     };
     
-    // const API_BASE_URL = 'http://localhost:3000';
     const API_BASE_URL = 'http://127.0.0.1:3000';
 
     // --- NAVIGATION & UI CONTROL ---
-    // (This section is unchanged)
     const showLogin = () => {
         loginOverlay.style.display = 'flex';
         appWrapper.classList.add('hidden');
@@ -54,6 +51,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         navLinks.admin.style.display = permissionService.can('VIEW_ADMIN_PANEL') ? 'flex' : 'none';
         navLinks.ledger.style.display = permissionService.can('VIEW_LEDGER') ? 'flex' : 'none';
 
+        // *** MODIFIED: loadBlockchain now fetches from server ***
         await loadBlockchain();
         rebuildInventoryState();
         navigateTo('dashboard');
@@ -107,26 +105,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // --- EVENT HANDLERS (Delegated & Static) ---
 
-    // *** MODIFIED: Main login form uses the text input ***
     loginForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const email = loginEmailInput.value; // Use the input field
+        const email = loginEmailInput.value;
         const password = document.getElementById('login-password').value;
         await authService.login(email, password, showApp, showError);
     });
 
-    // *** NEW: Quick login button uses the dropdown ***
     quickLoginButton.addEventListener('click', async () => {
-        const email = loginEmailSelect.value; // Use the select field
-        const password = "password"; // Hardcoded password
+        const email = loginEmailSelect.value;
+        const password = "password";
         await authService.login(email, password, showApp, showError);
     });
 
-    // *** NEW: Sync select and input fields for convenience ***
     loginEmailSelect.addEventListener('change', () => {
         loginEmailInput.value = loginEmailSelect.value;
     });
-
 
     logoutButton.addEventListener('click', () => authService.logout(showLogin));
     navLinks.dashboard.addEventListener('click', (e) => { e.preventDefault(); navigateTo('dashboard'); });
@@ -134,8 +128,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     navLinks.admin.addEventListener('click', (e) => { e.preventDefault(); navigateTo('admin'); });
     navLinks.ledger.addEventListener('click', (e) => { e.preventDefault(); navigateTo('ledger'); });
 
-    // (All other event listeners are unchanged)
-    // *** MODIFIED: Added 'add-user-form' to the submit listener ***
     appContent.addEventListener('submit', async (e) => {
         e.preventDefault();
         
@@ -154,7 +146,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             await handleMoveStock(e.target);
         }
 
-        // *** FIX 2: Added listener for the new Add User form ***
         if (e.target.id === 'add-user-form') {
             if (!permissionService.can('MANAGE_USERS')) return showError("Access Denied.");
             await handleAddUser(e.target);
@@ -167,7 +158,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    // *** MODIFIED: Role change logic removed from 'click' listener ***
     appContent.addEventListener('click', async (e) => {
         if (e.target.closest('#back-to-list-button')) {
             navigateTo('products');
@@ -192,19 +182,20 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
+        // *** MODIFIED: Updated handler logic ***
         if (e.target.closest('#clear-db-button')) {
             if (!permissionService.can('CLEAR_DB')) return showError("Access Denied.");
-            await handleClearDb();
+            if (confirm('Are you sure you want to clear the entire blockchain? This cannot be undone.')) {
+                await handleClearDb();
+            }
         }
+        // *** MODIFIED: Updated handler logic ***
         if (e.target.closest('#verify-chain-button')) {
             if (!permissionService.can('VERIFY_CHAIN')) return showError("Access Denied.");
             await handleVerifyChain();
         }
-        
-        // *** BUG FIX: This logic was removed from here. ***
     });
 
-    // *** FIX 1: Added a 'change' listener to correctly handle the role <select> dropdown ***
     appContent.addEventListener('change', async (e) => {
         if (e.target.classList.contains('role-select')) {
             if (!permissionService.can('MANAGE_USERS')) return showError("Access Denied.");
@@ -214,8 +205,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 
     // --- FORM HANDLERS (UI LOGIC) ---
-    // (handleAddItem, handleUpdateStock, handleMoveStock, handleClearDb, handleVerifyChain are all unchanged)
 
+    // *** MODIFIED: Added try...catch block ***
     const handleAddItem = async (form) => {
         const itemSku = form.querySelector('#add-product-id').value;
         const itemName = form.querySelector('#add-product-name').value;
@@ -230,28 +221,38 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const beforeQuantity = 0;
         const afterQuantity = quantity;
-        const user = currentUser;
-
+        
         const transaction = {
             txType: "CREATE_ITEM", itemSku, itemName, quantity,
-            price,
-            category,
-            beforeQuantity, afterQuantity, toLocation,
-            userId: user.id, employeeId: user.employee_id, userName: user.name,
-            timestamp: new Date().toISOString()
+            price, category,
+            beforeQuantity, afterQuantity, toLocation
+            // User details (id, name, employeeId) will be added by the server
         };
 
+        // Client-side "pre-check"
         if (processTransaction(transaction, false, showError)) {
-            await addTransactionToChain(transaction);
-            renderProductList();
-            showSuccess(`Product ${itemName} added!`);
-            form.reset();
-            form.querySelector('#add-product-id').value = `SKU-${Math.floor(100 + Math.random() * 900)}`;
-            form.querySelector('#add-product-name').value = "New Product";
-            form.querySelector('#add-product-category').value = "Electronics";
+            try {
+                // Send to server for validation and block creation
+                await addTransactionToChain(transaction);
+                
+                // Success! Re-render UI.
+                renderProductList();
+                showSuccess(`Product ${itemName} added!`);
+                form.reset();
+                form.querySelector('#add-product-id').value = `SKU-${Math.floor(100 + Math.random() * 900)}`;
+                form.querySelector('#add-product-name').value = "New Product";
+                form.querySelector('#add-product-category').value = "Electronics";
+
+            } catch (error) {
+                // Server rejected the transaction
+                showError(`Server error: ${error.message}`);
+                // CRITICAL: Revert the client state
+                rebuildInventoryState();
+            }
         }
     };
 
+    // *** MODIFIED: Added try...catch block ***
     const handleUpdateStock = async (form) => {
         const itemSku = document.getElementById('update-product-id').value;
         const quantity = parseInt(form.querySelector('#update-quantity').value, 10);
@@ -264,7 +265,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         let transaction = {};
         let success = false;
         let beforeQuantity, afterQuantity;
-        const user = currentUser;
 
         if (actionType === 'STOCK_IN') {
             const locationIn = form.querySelector('#update-location').value;
@@ -272,41 +272,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             afterQuantity = beforeQuantity + quantity;
 
             transaction = { 
-                txType: "STOCK_IN", 
-                itemSku, 
-                quantity, 
+                txType: "STOCK_IN", itemSku, quantity, 
                 location: locationIn, 
-                beforeQuantity, 
-                afterQuantity,
-                userId: user.id, 
-                employeeId: user.employeeId, 
-                userName: user.name, 
-                timestamp: new Date().toISOString() 
+                beforeQuantity, afterQuantity
             };
-            success = processTransaction(transaction, false, showError);
-
-
-
-        // } else if (actionType === 'STOCK_OUT') {
-        //     const locationOut = form.querySelector('#update-location').value;
-        //     beforeQuantity = product.locations.get(locationOut) || 0;
-        //     afterQuantity = beforeQuantity - quantity;
-            
-        //     transaction = { 
-        //         txType: "STOCK_OUT", 
-        //         itemSku, 
-        //         quantity, 
-        //         location: locationOut, 
-        //         beforeQuantity, 
-        //         afterQuantity,
-        //         userId: user.id, 
-        //         employeeId: user.employeeId, 
-        //         userName: user.name, 
-        //         timestamp: new Date().toISOString() 
-        //     };
-        //     success = processTransaction(transaction, false, showError);
-        // }
-
+            success = processTransaction(transaction, false, showError); // Client pre-check
 
         } else if (actionType === 'STOCK_OUT') {
             const locationOut = form.querySelector('#update-location').value;
@@ -314,27 +284,33 @@ document.addEventListener('DOMContentLoaded', async () => {
             afterQuantity = beforeQuantity - quantity;
             
             transaction = { 
-                txType: "STOCK_OUT", 
-                itemSku, 
-                quantity, 
+                txType: "STOCK_OUT", itemSku, quantity, 
                 location: locationOut, 
-                beforeQuantity, 
-                afterQuantity,
-                userId: user.id, 
-                employeeId: user.employee_id, // <-- ADD THIS LINE
-                userName: user.name, 
-                timestamp: new Date().toISOString() 
+                beforeQuantity, afterQuantity
             };
-            success = processTransaction(transaction, false, showError);
+            success = processTransaction(transaction, false, showError); // Client pre-check
         }
 
         if (success) {
-            await addTransactionToChain(transaction);
-            renderProductDetail(itemSku);
-            showSuccess(`Stock for ${itemSku} updated!`);
+            try {
+                // Send to server for validation and block creation
+                await addTransactionToChain(transaction);
+                
+                // Success! Re-render UI.
+                renderProductDetail(itemSku);
+                showSuccess(`Stock for ${itemSku} updated!`);
+            
+            } catch (error) {
+                // Server rejected the transaction
+                showError(`Server error: ${error.message}`);
+                // CRITICAL: Revert the client state and re-render
+                rebuildInventoryState();
+                renderProductDetail(itemSku);
+            }
         }
     };
 
+    // *** MODIFIED: Added try...catch block ***
     const handleMoveStock = async (form) => {
         const itemSku = document.getElementById('update-product-id').value;
         const quantity = parseInt(form.querySelector('#move-quantity').value, 10);
@@ -349,56 +325,83 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         const product = inventory.get(itemSku);
-        const user = currentUser;
-
         const beforeFromQty = product.locations.get(fromLocation) || 0;
         const beforeToQty = product.locations.get(toLocation) || 0;
         const afterFromQty = beforeFromQty - quantity;
         const afterToQty = beforeToQty + quantity;
 
         const transaction = {
-            txType: "MOVE",
-            itemSku,
-            quantity,
-            fromLocation,
-            toLocation,
+            txType: "MOVE", itemSku, quantity,
+            fromLocation, toLocation,
             beforeQuantity: { from: beforeFromQty, to: beforeToQty },
-            afterQuantity: { from: afterFromQty, to: afterToQty },
-            userId: user.id, 
-            employeeId: user.employee_id,
-            userName: user.name, 
-            timestamp: new Date().toISOString() 
+            afterQuantity: { from: afterFromQty, to: afterToQty }
         };
 
+        // Client pre-check
         if (processTransaction(transaction, false, showError)) {
-            await addTransactionToChain(transaction);
-            renderProductDetail(itemSku);
-            showSuccess(`Moved ${quantity} units of ${itemSku} from ${fromLocation} to ${toLocation}.`);
+            try {
+                // Send to server for validation and block creation
+                await addTransactionToChain(transaction);
+                
+                // Success! Re-render UI.
+                renderProductDetail(itemSku);
+                showSuccess(`Moved ${quantity} units of ${itemSku} from ${fromLocation} to ${toLocation}.`);
+            
+            } catch (error) {
+                // Server rejected the transaction
+                showError(`Server error: ${error.message}`);
+                // CRITICAL: Revert the client state and re-render
+                rebuildInventoryState();
+                renderProductDetail(itemSku);
+            }
         }
     };
 
+    // *** MODIFIED: Calls DELETE /api/blockchain ***
     const handleClearDb = async () => {
-        localStorage.removeItem(DB_KEY);
-        inventory.clear();
-        await loadBlockchain();
-        await authService.init(showApp, showLogin); 
-        navigateTo('dashboard');
-        showSuccess("Local blockchain cleared.");
-        
-        if (!currentUser) {
-            await populateLoginDropdown();
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/blockchain`, {
+                method: 'DELETE',
+                credentials: 'include'
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.message || 'Failed to clear database');
+            }
+            
+            // Server returns the remaining chain (just Genesis)
+            blockchain = data.chain;
+            rebuildInventoryState(); // Rebuild from the Genesis block
+            navigateTo('dashboard');
+            showSuccess("Server blockchain cleared.");
+            
+        } catch (error) {
+            showError(error.message);
         }
     };
 
+    // *** MODIFIED: Calls GET /api/blockchain/verify ***
     const handleVerifyChain = async () => {
-        const isValid = await isChainValid(blockchain);
-        if (isValid) {
-            showSuccess("Verification complete: Blockchain is valid!");
-        } else {
-            showError("CRITICAL: Blockchain is invalid! Tampering detected.");
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/blockchain/verify`, {
+                credentials: 'include'
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.message || 'Verification check failed');
+            }
+            
+            if (data.isValid) {
+                showSuccess("Verification complete: Blockchain is valid!");
+            } else {
+                showError("CRITICAL: Blockchain is invalid! Tampering detected.");
+            }
+        } catch (error) {
+            showError(error.message);
         }
     };
     
+    // (handleRoleChange is unchanged)
     const handleRoleChange = async (userId, newRole) => {
         try {
             const response = await fetch(`${API_BASE_URL}/api/users/${userId}/role`, {
@@ -413,10 +416,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
             showSuccess(`Role for ${data.user.name} updated to ${newRole}.`);
             
-            // If admin changes their own role (which is blocked by server, but good to check)
             if (data.user.id === currentUser.id) { 
                 currentUser = data.user;
-                await showApp(); // Re-render app to hide/show nav links
+                // Need to re-render the *entire* app UI to update nav
+                document.getElementById('user-role').textContent = currentUser.role;
+                navLinks.admin.style.display = permissionService.can('VIEW_ADMIN_PANEL') ? 'flex' : 'none';
+                navLinks.ledger.style.display = permissionService.can('VIEW_LEDGER') ? 'flex' : 'none';
             }
         } catch (error) {
             showError(error.message);
@@ -424,7 +429,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     };
 
-    // *** NEW: Handler for the Add User form ***
+    // (handleAddUser is unchanged)
     const handleAddUser = async (form) => {
         const name = form.querySelector('#add-user-name').value;
         const email = form.querySelector('#add-user-email').value;
@@ -448,6 +453,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             showSuccess(`User ${data.user.name} created successfully!`);
             form.reset();
             renderAdminPanel(); // Refresh the user list
+            await populateLoginDropdown(); // Refresh the login dropdown
             
         } catch (error) {
             showError(error.message);
@@ -456,8 +462,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 
     // --- VIEW RENDERING FUNCTIONS (UI LOGIC) ---
-    // (renderDashboard, renderProductList, renderProductDetail, renderItemHistory, renderFullLedger, createLedgerBlockElement are unchanged)
-    
+    // (renderDashboard is unchanged)
     const renderDashboard = () => {
         let totalUnits = 0;
         let totalValue = 0;
@@ -551,7 +556,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             lowStockContainer.style.display = 'none';
         }
     };
-
+    
+    // (renderProductList is unchanged)
     const renderProductList = () => {
         const productGrid = appContent.querySelector('#product-grid');
         if (!productGrid) return;
@@ -606,6 +612,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     };
 
+    // (renderProductDetail is unchanged)
     const renderProductDetail = (productId) => {
         const product = inventory.get(productId);
         if (!product) {
@@ -641,6 +648,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         renderItemHistory(productId);
     };
 
+    // (renderItemHistory is unchanged)
     const renderItemHistory = (productId) => {
         const historyDisplay = appContent.querySelector('#item-history-display');
         historyDisplay.innerHTML = '';
@@ -659,6 +667,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     };
     
+    // (renderFullLedger is unchanged)
     const renderFullLedger = () => {
         const ledgerDisplay = appContent.querySelector('#full-ledger-display');
         ledgerDisplay.innerHTML = '';
@@ -669,6 +678,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     };
     
+    // (renderAdminPanel is unchanged)
     const renderAdminPanel = async () => {
         const tableBody = appContent.querySelector('#user-management-table');
         if (!tableBody) return; // In case view is changed quickly
@@ -713,6 +723,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     };
 
+    // (createLedgerBlockElement is unchanged, server now adds user info)
     const createLedgerBlockElement = (block) => {
         const blockElement = document.createElement('div');
         blockElement.className = 'border border-slate-200 rounded-lg p-3 bg-white shadow-sm';
@@ -721,10 +732,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         let transactionHtml = '';
         let detailsHtml = '';
 
+        const userHtml = `<li>User: <strong>${userName || 'N/A'}</strong> (${employeeId || 'N/A'})</li>`;
+
         switch (txType) {
             case 'CREATE_ITEM':
                 transactionHtml = `<span class="font-semibold text-green-700">CREATE</span> <strong>${quantity}</strong> of <strong>${itemName}</strong> (${itemSku}) to <strong>${toLocation}</strong>`;
-                detailsHtml = `<li>User: <strong>${userName}</strong> (${employeeId})</li>
+                detailsHtml = `${userHtml}
                                <li>Price: <strong>₹${(price || 0).toFixed(2)}</strong></li>
                                <li>Category: <strong>${category || 'N/A'}</strong></li>`;
                 break;
@@ -732,17 +745,17 @@ document.addEventListener('DOMContentLoaded', async () => {
                 transactionHtml = `<span class="font-semibold text-blue-600">MOVE</span> <strong>${quantity}</strong> of <strong>${itemSku}</strong>`;
                 detailsHtml = `<li>From: <strong>${fromLocation}</strong> (Before: ${beforeQuantity.from}, After: ${afterQuantity.from})</li>
                                <li>To: <strong>${toLocation}</strong> (Before: ${beforeQuantity.to}, After: ${afterQuantity.to})</li>
-                               <li>User: <strong>${userName}</strong> (${employeeId})</li>`;
+                               ${userHtml}`;
                 break;
             case 'STOCK_IN':
                 transactionHtml = `<span class="font-semibold text-green-600">STOCK IN</span> <strong>${quantity}</strong> of <strong>${itemSku}</strong> at <strong>${location}</strong>`;
                 detailsHtml = `<li>Before: ${beforeQuantity}, After: ${afterQuantity}</li>
-                               <li>User: <strong>${userName}</strong> (${employeeId})</li>`;
+                               ${userHtml}`;
                 break;
             case 'STOCK_OUT':
                 transactionHtml = `<span class="font-semibold text-red-600">STOCK OUT</span> <strong>${quantity}</strong> of <strong>${itemSku}</strong> from <strong>${location}</strong>`;
                 detailsHtml = `<li>Before: ${beforeQuantity}, After: ${afterQuantity}</li>
-                               <li>User: <strong>${userName}</strong> (${employeeId})</li>`;
+                               ${userHtml}`;
                 break;
         }
 
@@ -763,9 +776,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         return blockElement;
     };
     
-    // --- TOAST/NOTIFICATION FUNCTIONS (UI LOGIC) ---
-    // (This section is unchanged)
-    
+    // (Toast/notification functions are unchanged)
     let errorTimer;
     const showError = (message, suppress = false) => {
         console.error(message);
@@ -785,12 +796,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         successTimer = setTimeout(() => successToast.classList.remove('toast-show'), 3000);
     };
 
-    /**
-     * *** MODIFIED: This function now populates BOTH the select and the input field. ***
-     */
+    // (populateLoginDropdown is unchanged)
     const populateLoginDropdown = async () => {
         try {
-            // Note: This endpoint must be public on the server for this to work.
             const response = await fetch(`${API_BASE_URL}/api/users`);
             if (!response.ok) {
                 const err = await response.json();
@@ -798,8 +806,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
             
             const users = await response.json();
-            
-            loginEmailSelect.innerHTML = ''; // Clear select
+            loginEmailSelect.innerHTML = '';
             
             users.forEach((user, index) => {
                 const option = document.createElement('option');
@@ -807,7 +814,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 option.textContent = `${user.name} (${user.role})`;
                 loginEmailSelect.appendChild(option);
 
-                // *** NEW: Set the input field's value to the first user (Admin) ***
                 if (index === 0) {
                     loginEmailInput.value = user.email;
                 }
@@ -815,16 +821,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         } catch (error) {
             console.error(error.message);
-            showError(error.message, true); // Suppress toast on initial load
+            showError(error.message, true);
             loginEmailSelect.innerHTML = '<option value="">Could not load users</option>';
             loginEmailInput.value = '';
             loginEmailInput.placeholder = 'Error loading users';
         }
     };
 
-
     // --- INITIALIZATION ---
-    
     await populateLoginDropdown();
+    // authService.init will show login or app
     await authService.init(showApp, showLogin);
 });

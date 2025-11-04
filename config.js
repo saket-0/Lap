@@ -1,4 +1,4 @@
+// Lap/config.js
 
-// The backend server and database manage all user data.
-
-const DB_KEY = 'bimsChain'; // For the blockchain (this remains, as it's still in localStorage)
+// The backend server and database manage all user data and blockchain data.
+// The localStorage key is no longer needed.
