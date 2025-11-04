@@ -4,12 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BIMS - Blockchain Inventory Management</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- <script src="https://cdn.tailwindcss.com"></script> -->
+    <script src="assets/tailwind.js"></script>
+    <!-- <link rel="preconnect" href="https://fonts.googleapis.com"> -->
+    <!-- <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin> -->
+    <!-- <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"> -->
     <link rel="stylesheet" href="styles.css">
-    <script src="https://unpkg.com/@phosphor-icons/web@2.0.3"></script>
+    <!-- <link rel="stylesheet" href="styles.css"> -->
+
+    <link rel="stylesheet" href="assets/phosphor-icons/regular.css">
+    <link rel="stylesheet" href="assets/phosphor-icons/thin.css">
+    <link rel="stylesheet" href="assets/phosphor-icons/light.css">
+    <link rel="stylesheet" href="assets/phosphor-icons/bold.css">
+    <link rel="stylesheet" href="assets/phosphor-icons/fill.css">
+    <link rel="stylesheet" href="assets/phosphor-icons/duotone.css">
+
+    <!-- <script src="assets/phosphor-icons.js"></script> -->
 </head>
 <body class="bg-slate-100 text-slate-900">
 
@@ -112,20 +122,49 @@
             <h1 class="text-4xl font-bold text-slate-800">Dashboard</h1>
             
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div class="bg-white p-6 rounded-lg shadow-md">
+
+                <!-- <div class="bg-white p-6 rounded-lg shadow-md">
                     <h3 class="text-sm font-medium text-slate-500 uppercase">Total Value</h3>
                     <p id="kpi-total-value" class="text-4xl font-bold text-indigo-600">₹0.00</p>
                     <p class="text-xs text-slate-400 mt-1">Inventory valuation</p>
+                </div> -->
+                <div class="bg-white p-6 rounded-lg shadow-md flex items-center justify-between">
+                    <div>
+                        <h3 class="text-sm font-medium text-slate-500 uppercase">Total Value</h3>
+                        <p id="kpi-total-value" class="text-4xl font-bold text-indigo-600">₹0.00</p>
+                        <p class="text-xs text-slate-400 mt-1">Inventory valuation</p>
+                    </div>
+                    <i class="ph-bold ph-currency-inr text-5xl text-indigo-300"></i>
                 </div>
-                <div class="bg-white p-6 rounded-lg shadow-md">
+
+                <!-- <div class="bg-white p-6 rounded-lg shadow-md">
                     <h3 class="text-sm font-medium text-slate-500 uppercase">Total Units</h3>
                     <p id="kpi-total-units" class="text-4xl font-bold text-indigo-600">0</p>
                     <p class="text-xs text-slate-400 mt-1">All units across all locations</p>
+                </div> -->
+
+                <div class="bg-white p-6 rounded-lg shadow-md flex items-center justify-between">
+                    <div>
+                        <h3 class="text-sm font-medium text-slate-500 uppercase">Total Units</h3>
+                        <p id="kpi-total-units" class="text-4xl font-bold text-indigo-600">0</p>
+                        <p class="text-xs text-slate-400 mt-1">All units across all locations</p>
+                    </div>
+                    <i class="ph-bold ph-stack text-5xl text-indigo-300"></i>
                 </div>
-                <div class="bg-white p-6 rounded-lg shadow-md">
+
+                <!-- <div class="bg-white p-6 rounded-lg shadow-md">
                     <h3 class="text-sm font-medium text-slate-500 uppercase">Transactions</h3>
                     <p id="kpi-transactions" class="text-4xl font-bold text-indigo-600">0</p>
                     <p class="text-xs text-slate-400 mt-1">Blockchain records</p>
+                </div> -->
+
+                <div class="bg-white p-6 rounded-lg shadow-md flex items-center justify-between">
+                    <div>
+                        <h3 class="text-sm font-medium text-slate-500 uppercase">Transactions</h3>
+                        <p id="kpi-transactions" class="text-4xl font-bold text-indigo-600">0</p>
+                        <p class="text-xs text-slate-400 mt-1">Blockchain records</p>
+                    </div>
+                    <i class="ph-bold ph-arrows-left-right text-5xl text-indigo-300"></i>
                 </div>
             </div>
 

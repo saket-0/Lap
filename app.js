@@ -101,6 +101,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 renderDashboard();
                 break;
         }
+        // ADD THIS LINE:
+        // tailwind.init(); // Manually re-runs the Tailwind script on the new HTML
     };
     
     // --- EVENT HANDLERS (Delegated & Static) ---
