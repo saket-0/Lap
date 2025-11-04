@@ -1,7 +1,3 @@
-Here is an elaborate `readme.md` file for your project.
-
------
-
 # BIMS: Blockchain Inventory Management System
 
 BIMS is a modern, secure, web-based application designed to manage inventory using an immutable blockchain ledger. It features a client-server architecture with a lightweight vanilla JavaScript frontend and a robust Node.js backend, all backed by a PostgreSQL database.
