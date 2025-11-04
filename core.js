@@ -2,7 +2,10 @@
 let blockchain = [];
 let inventory = new Map(); // The "World State"
 let currentUser = null;
-let usersDb = [];
+// let usersDb = []; // *** MODIFIED: This is no longer needed; it's managed by the backend.
+
+// *** MODIFIED: Define the base URL for your backend server ***
+const API_BASE_URL = 'http://localhost:3000';
 
 // --- SERVICES (Simulating Backend Logic) ---
 
@@ -12,40 +15,73 @@ let usersDb = [];
  * so this core file doesn't need to know about the DOM.
  */
 const authService = {
-    init: (showAppCallback, showLoginCallback) => {
-        // Populate users DB (simulates user table)
-        if (!localStorage.getItem(USERS_KEY)) {
-            localStorage.setItem(USERS_KEY, JSON.stringify(MOCK_USERS));
+    /**
+     * *** MODIFIED: Checks for an existing server-side session. ***
+     */
+    init: async (showAppCallback, showLoginCallback) => {
+        try {
+            // Check if we have a valid session cookie with the server
+            const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+                credentials: 'include' // This is essential for sending cookies
+            });
+            
+            if (!response.ok) {
+                // No valid session
+                throw new Error('Not authenticated');
+            }
+            
+            currentUser = await response.json(); // Server sends back the user object
+            await showAppCallback(); // User is logged in, show the app
+        
+        } catch (error) {
+            console.warn('No active session:', error.message);
+            showLoginCallback(); // No user, show login
         }
-        usersDb = JSON.parse(localStorage.getItem(USERS_KEY));
+    },
+    
+    /**
+     * *** MODIFIED: Logs in by sending credentials to the backend. ***
+     */
+    login: async (email, password, showAppCallback, showErrorCallback) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include', // This is essential for session cookies
+                body: JSON.stringify({ email, password })
+            });
 
-        // Check for logged-in user
-        const savedUser = localStorage.getItem(AUTH_KEY);
-        if (savedUser) {
-            currentUser = JSON.parse(savedUser);
-            showAppCallback();
-        } else {
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.message || 'Login failed');
+            }
+
+            currentUser = data.user; // Backend sends back the user object
+            await showAppCallback(); // Show the app
+
+        } catch (error) {
+            showErrorCallback(error.message);
+        }
+    },
+
+    /**
+     * *** MODIFIED: Logs out by invalidating the server session. ***
+     */
+    logout: async (showLoginCallback) => { // *** Made async ***
+        try {
+            // Tell the server to destroy the session
+            await fetch(`${API_BASE_URL}/api/auth/logout`, {
+                method: 'POST',
+                credentials: 'include' // This is essential for session cookies
+            });
+        } catch (error) {
+            console.error('Error logging out:', error);
+        } finally {
+            currentUser = null;
+            // localStorage.removeItem(AUTH_KEY); // *** MODIFIED: This is no longer needed ***
             showLoginCallback();
         }
-    },
-    login: (email, password, showAppCallback, showErrorCallback) => {
-        if (password !== 'password') {
-            showErrorCallback("Invalid password. (Hint: use 'password')");
-            return;
-        }
-        const user = usersDb.find(u => u.email === email);
-        if (user) {
-            currentUser = user;
-            localStorage.setItem(AUTH_KEY, JSON.stringify(currentUser));
-            showAppCallback();
-        } else {
-            showErrorCallback("User not found.");
-        }
-    },
-    logout: (showLoginCallback) => {
-        currentUser = null;
-        localStorage.removeItem(AUTH_KEY);
-        showLoginCallback();
     }
 };
 
@@ -85,17 +121,18 @@ const permissionService = {
 };
 
 // --- CORE LOGIC (Blockchain & Inventory) ---
+// (This section remains unchanged as blockchain is still local)
 
-const addTransactionToChain = (transaction) => {
+const addTransactionToChain = async (transaction) => {
     const index = blockchain.length;
     const previousHash = blockchain[blockchain.length - 1].hash;
-    const newBlock = createBlock(index, transaction, previousHash); // from blockchain.js
+    const newBlock = await createBlock(index, transaction, previousHash);
     blockchain.push(newBlock);
     saveBlockchain();
 };
 
 const processTransaction = (transaction, suppressErrors = false, showErrorCallback) => {
-    const { txType, itemSku, itemName, quantity, fromLocation, toLocation, location } = transaction;
+    const { txType, itemSku, itemName, quantity, fromLocation, toLocation, location, price, category } = transaction;
 
     let product;
     if (txType !== 'CREATE_ITEM' && !inventory.has(itemSku)) {
@@ -116,6 +153,8 @@ const processTransaction = (transaction, suppressErrors = false, showErrorCallba
             if (!inventory.has(itemSku)) {
                  inventory.set(itemSku, {
                     productName: itemName,
+                    price: price || 0,
+                    category: category || 'Uncategorized',
                     locations: new Map()
                 });
             }
@@ -129,6 +168,10 @@ const processTransaction = (transaction, suppressErrors = false, showErrorCallba
             if (fromQty < quantity) {
                 if (showErrorCallback) showErrorCallback(`Insufficient stock at ${fromLocation}. Only ${fromQty} available.`, suppressErrors);
                 return false;
+            }
+            if (fromLocation === toLocation) {
+                 if (showErrorCallback) showErrorCallback(`Cannot move item to its current location.`, suppressErrors);
+                 return false;
             }
             const toQty = product.locations.get(toLocation) || 0;
             product.locations.set(fromLocation, fromQty - quantity);
@@ -153,19 +196,17 @@ const processTransaction = (transaction, suppressErrors = false, showErrorCallba
 };
 
 // --- INITIALIZATION & DB HELPERS ---
+// (This section remains unchanged)
 
 const saveBlockchain = () => {
     try {
         localStorage.setItem(DB_KEY, JSON.stringify(blockchain));
     } catch (e) {
         console.error("Failed to save blockchain:", e);
-        // We need a way to show errors. We'll pass the UI callback.
-        // This is getting complex. For now, we'll just console.error.
-        // A better long-term solution is a proper event bus.
     }
 };
 
-const loadBlockchain = () => {
+const loadBlockchain = async () => {
     const savedChain = localStorage.getItem(DB_KEY);
     if (savedChain) {
         try {
@@ -174,11 +215,11 @@ const loadBlockchain = () => {
         } catch (e) {
             console.error("Failed to parse saved blockchain:", e);
             localStorage.removeItem(DB_KEY);
-            blockchain = [createGenesisBlock()];
+            blockchain = [await createGenesisBlock()];
             saveBlockchain();
         }
     } else {
-        blockchain = [createGenesisBlock()];
+        blockchain = [await createGenesisBlock()];
         saveBlockchain();
     }
 };
