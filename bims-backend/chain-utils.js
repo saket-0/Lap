@@ -3,13 +3,11 @@ const crypto = require('crypto');
 
 /**
  * Calculates the SHA-256 hash of a given data object (Node.js version).
- * This function is UNCHANGED, but our inputs to it will be fixed.
  * @param {object} data The data to hash.
  * @returns {Promise<string>} A promise that resolves to the hexadecimal hash string.
  */
 async function calculateHash(data) {
     // Create a canonical, ordered string for consistent hashing
-    // This sorts the top-level keys: index, previousHash, timestamp, transaction
     const str = JSON.stringify(data, Object.keys(data).sort());
     
     // Use Node.js's built-in crypto module
@@ -25,9 +23,10 @@ async function calculateHash(data) {
  * @returns {Promise<object>} A promise that resolves to the new block object.
  */
 async function createBlock(index, transaction, previousHash) {
-    const timestamp = new Date().toISOString(); // Timestamp is a string
+    // We use an ISOString to ensure the hash is created from a
+    // consistent string, not a Date object with millisecond issues.
+    const timestamp = new Date().toISOString();
     
-    // --- START: FIX ---
     // Create a new, sorted transaction object to ensure consistent hashing
     const sortedTransaction = Object.keys(transaction)
         .sort()
@@ -35,26 +34,22 @@ async function createBlock(index, transaction, previousHash) {
             obj[key] = transaction[key];
             return obj;
         }, {});
-    // --- END: FIX ---
 
     // Create the block *data* that will be hashed
     const blockData = {
         index,
-        timestamp,
-        transaction: sortedTransaction, // Use the sorted transaction object
+        timestamp, // timestamp is an ISO String
+        transaction: sortedTransaction,
         previousHash,
     };
     
-    // The hash is calculated asynchronously from the block's data
     const hash = await calculateHash(blockData);
     
-    // Return the full block, including its new hash
     return { ...blockData, hash };
 }
 
 /**
  * Creates the first (Genesis) block of the chain.
- * (This function is simple enough that it doesn't need the sort fix)
  * @returns {Promise<object>} A promise that resolves to the Genesis block.
  */
 async function createGenesisBlock() {
@@ -71,37 +66,37 @@ async function isChainValid(blockchainArray) {
         const currentBlock = blockchainArray[i];
         const previousBlock = blockchainArray[i - 1];
 
-        // 1. Check if the stored previousHash matches the actual previous block's hash
-        if (currentBlock.previousHash !== previousBlock.hash) {
+        // --- START: FINAL FIX ---
+        // Trim whitespace from hash fields during comparison
+        // to prevent data type or padding issues from the DB.
+        if (currentBlock.previousHash.trim() !== previousBlock.hash.trim()) {
+        // --- END: FINAL FIX ---
             console.error(`Chain invalid: previousHash mismatch at block ${i}.`);
             return false;
         }
 
-        // --- START: FIX ---
         // Create a new, sorted transaction object from the DB data
-        // to ensure the re-calculated hash matches the original.
         const sortedTransaction = Object.keys(currentBlock.transaction)
             .sort()
             .reduce((obj, key) => {
                 obj[key] = currentBlock.transaction[key];
                 return obj;
             }, {});
-        // --- END: FIX ---
 
         // 2. Re-calculate the hash of the current block
         const blockDataToRecalculate = {
             index: currentBlock.index,
-            timestamp: currentBlock.timestamp, // This is a Date object from PG
-            transaction: sortedTransaction, // Use the sorted transaction object
+            // Convert timestamp from DB (Date object) to the exact
+            // same string format used during creation.
+            timestamp: currentBlock.timestamp.toISOString(),
+            transaction: sortedTransaction,
             previousHash: currentBlock.previousHash,
         };
         
-        // Await the asynchronous hash calculation
-        // JSON.stringify() will correctly convert the Date object to an
-        // ISO string, matching the string format used during creation.
         const recalculatedHash = await calculateHash(blockDataToRecalculate);
 
-        if (currentBlock.hash !== recalculatedHash) {
+        // Also trim here for the second check
+        if (currentBlock.hash.trim() !== recalculatedHash.trim()) {
             console.error(`Chain invalid: Hash mismatch at block ${i}. Expected ${currentBlock.hash} but got ${recalculatedHash}`);
             return false;
         }
@@ -111,7 +106,7 @@ async function isChainValid(blockchainArray) {
 }
 
 
-// --- (The rest of the file is unchanged) ---
+// --- (The rest of the file is unchanged, including the fix for validateTransaction) ---
 
 
 /**

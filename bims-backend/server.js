@@ -6,7 +6,6 @@ const bcrypt = require('bcryptjs');
 const session = require('express-session');
 const PgSession = require('connect-pg-simple')(session);
 
-// --- NEW: Import blockchain utilities ---
 const { 
     createBlock, 
     createGenesisBlock, 
@@ -102,6 +101,7 @@ const isAuthenticated = (req, res, next) => {
 
 // --- 5. API Endpoints (Auth & Users) ---
 
+// (All Auth and User endpoints are unchanged)
 // POST /api/auth/login
 app.post('/api/auth/login', async (req, res) => {
     console.log('\n🔐 LOGIN ATTEMPT');
@@ -266,30 +266,53 @@ app.post('/api/users', isAuthenticated, async (req, res) => {
 });
 
 
-// --- 6. NEW: Blockchain Endpoints ---
+// --- 6. Blockchain Endpoints ---
+
+// SQL query to select columns and alias them to camelCase
+const SELECT_BLOCKCHAIN_FIELDS = `
+    SELECT 
+        index, 
+        timestamp, 
+        transaction, 
+        previous_hash AS "previousHash", 
+        hash 
+    FROM blockchain
+`;
 
 // Helper function to get or create the Genesis block
 async function getGenesisBlock() {
-    let result = await pool.query('SELECT * FROM blockchain WHERE index = 0');
+    // FIX 1: Use aliased SELECT
+    let result = await pool.query(`${SELECT_BLOCKCHAIN_FIELDS} WHERE index = 0`);
     if (result.rows.length === 0) {
         console.log('🌱 No Genesis block found. Creating one...');
-        const genesisBlock = await createGenesisBlock();
-        await pool.query(
-            'INSERT INTO blockchain (index, timestamp, transaction, previous_hash, hash) VALUES ($1, $2, $3, $4, $5)',
-            [genesisBlock.index, genesisBlock.timestamp, genesisBlock.transaction, genesisBlock.previousHash, genesisBlock.hash]
-        );
-        console.log('🌱 Genesis block created.');
-        return genesisBlock;
+        try {
+            const genesisBlock = await createGenesisBlock();
+            await pool.query(
+                'INSERT INTO blockchain (index, timestamp, transaction, previous_hash, hash) VALUES ($1, $2, $3, $4, $5)',
+                [genesisBlock.index, genesisBlock.timestamp, genesisBlock.transaction, genesisBlock.previousHash, genesisBlock.hash]
+            );
+            console.log('🌱 Genesis block created.');
+            // Return the newly created block (which is already in camelCase)
+            return genesisBlock; 
+        } catch (e) {
+            if (e.code === '23505') { 
+                console.log('Race condition: Genesis block already created by another process.');
+                // FIX 2: Use aliased SELECT
+                return (await pool.query(`${SELECT_BLOCKCHAIN_FIELDS} WHERE index = 0`)).rows[0];
+            }
+            throw e;
+        }
     }
-    return result.rows[0];
+    return result.rows[0]; // Return the existing block (now in camelCase)
 }
 
 // GET /api/blockchain - Fetches the entire blockchain
 app.get('/api/blockchain', isAuthenticated, async (req, res) => {
     console.log('🔗 Fetching entire blockchain');
     try {
-        await getGenesisBlock(); // Ensure Genesis block exists
-        const result = await pool.query('SELECT * FROM blockchain ORDER BY index ASC');
+        await getGenesisBlock(); 
+        // FIX 3: Use aliased SELECT
+        const result = await pool.query(`${SELECT_BLOCKCHAIN_FIELDS} ORDER BY index ASC`);
         res.status(200).json(result.rows);
     } catch (e) {
         console.error('❌ Error fetching blockchain:', e);
@@ -302,18 +325,17 @@ app.post('/api/blockchain', isAuthenticated, async (req, res) => {
     console.log('📦 Adding new block');
     const transaction = req.body;
     
-    // Add user details from session to the transaction
     transaction.userId = req.session.user.id;
     transaction.userName = req.session.user.name;
     transaction.employeeId = req.session.user.employee_id;
-    transaction.timestamp = new Date().toISOString();
 
     try {
-        // 1. Get the current chain from DB
-        const chainResult = await pool.query('SELECT * FROM blockchain ORDER BY index ASC');
+        await getGenesisBlock();
+        
+        // FIX 4: Use aliased SELECT
+        const chainResult = await pool.query(`${SELECT_BLOCKCHAIN_FIELDS} ORDER BY index ASC`);
         const currentChain = chainResult.rows;
 
-        // 2. SERVER-SIDE VALIDATION:
         console.log('🔬 Validating transaction...');
         const { success, error } = validateTransaction(transaction, currentChain);
         if (!success) {
@@ -322,21 +344,26 @@ app.post('/api/blockchain', isAuthenticated, async (req, res) => {
         }
         console.log('✅ Transaction is valid.');
 
-        // 3. Get the last block
         const lastBlock = currentChain[currentChain.length - 1];
 
-        // 4. Create the new block
+        // This check now works because lastBlock.hash is correctly populated
+        if (!lastBlock.hash) {
+            console.error('❌ CRITICAL: Last block (Genesis) is missing a hash!');
+            return res.status(500).json({ message: 'CRITICAL: Chain is corrupt. Please clear database.' });
+        }
+
         const newIndex = lastBlock.index + 1;
+        // lastBlock.hash is now correctly read from the aliased query
         const newBlock = await createBlock(newIndex, transaction, lastBlock.hash);
 
-        // 5. Insert the new block
         await pool.query(
             'INSERT INTO blockchain (index, timestamp, transaction, previous_hash, hash) VALUES ($1, $2, $3, $4, $5)',
+            // newBlock properties are already camelCase, which match the values
             [newBlock.index, newBlock.timestamp, newBlock.transaction, newBlock.previousHash, newBlock.hash]
         );
         
         console.log(`✅ Block ${newBlock.index} added to chain.`);
-        res.status(201).json(newBlock); // Send the new block back to the client
+        res.status(201).json(newBlock);
 
     } catch (e) {
         console.error('❌ Error adding block:', e);
@@ -352,10 +379,13 @@ app.get('/api/blockchain/verify', isAuthenticated, async (req, res) => {
     }
 
     try {
-        const result = await pool.query('SELECT * FROM blockchain ORDER BY index ASC');
-        const blocks = result.rows;
+        await getGenesisBlock();
         
-        const isValid = await isChainValid(blocks);
+        // FIX 5: Use aliased SELECT
+        const result = await pool.query(`${SELECT_BLOCKCHAIN_FIELDS} ORDER BY index ASC`);
+        const blocks = result.rows; // blocks now have camelCase properties
+        
+        const isValid = await isChainValid(blocks); // This will now work!
         
         if (isValid) {
             console.log('✅ Chain is valid.');
@@ -379,13 +409,14 @@ app.delete('/api/blockchain', isAuthenticated, async (req, res) => {
     }
     
     try {
-        // Delete all blocks *except* the Genesis block (index 0)
-        await pool.query('DELETE FROM blockchain WHERE index > 0');
-        console.log('✅ Chain cleared (except Genesis).');
+        // This logic is correct: wipe everything, then create a new Genesis.
+        await pool.query('DELETE FROM blockchain');
+        console.log('✅ Entire chain wiped.');
         
-        // Fetch and return the remaining Genesis block
-        const result = await pool.query('SELECT * FROM blockchain WHERE index = 0');
-        res.status(200).json({ message: 'Blockchain cleared', chain: result.rows });
+        const genesisBlock = await getGenesisBlock(); // This will run the create logic
+        
+        // Return the new chain (genesisBlock is already camelCase)
+        res.status(200).json({ message: 'Blockchain cleared', chain: [genesisBlock] });
         
     } catch (e) {
         console.error('❌ Error clearing chain:', e);
