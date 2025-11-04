@@ -5,7 +5,8 @@ let currentUser = null;
 // let usersDb = []; // *** MODIFIED: This is no longer needed; it's managed by the backend.
 
 // *** MODIFIED: Define the base URL for your backend server ***
-const API_BASE_URL = 'http://localhost:3000';
+// const API_BASE_URL = 'http://localhost:3000';
+const API_BASE_URL = 'http://127.0.0.1:3000';
 
 // --- SERVICES (Simulating Backend Logic) ---
 

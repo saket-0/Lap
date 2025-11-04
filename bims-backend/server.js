@@ -7,7 +7,7 @@ const session = require('express-session');
 const PgSession = require('connect-pg-simple')(session);
 
 const app = express();
-const port = 3000; // Your backend will run on http://localhost:3000
+const port = 3000;
 
 // --- 1. Database Connection ---
 const pool = new Pool({
@@ -18,120 +18,186 @@ const pool = new Pool({
     port: 5432,
 });
 
-//=========================================================================================
-//=========================================================================================
-// // --- 2. Middleware Setup ---
-// app.use(cors({
-//     origin: 'http://127.0.0.1:5500', // Allow your index.html origin
-//     credentials: true // Allow cookies
-// }));
-// app.use(express.json()); // To parse JSON request bodies
+// CRITICAL: Set trust proxy - this helps Express understand it's behind a proxy
+app.set('trust proxy', 1);
 
-// --- 2. Middleware Setup ---
+// --- 2. CORS Setup (MUST come before other middleware) ---
 app.use(cors({
-    origin: ['http://127.0.0.1:5500', 'http://localhost:5500'], // Allow both origins
-    credentials: true // Allow cookies
+    origin: function(origin, callback) {
+        // Allow requests with no origin (mobile apps, Postman, etc.)
+        const allowedOrigins = [
+            'http://127.0.0.1:5500', 
+            'http://localhost:5500', 
+            'http://127.0.0.1:5501', 
+            'http://localhost:5501'
+        ];
+        
+        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    credentials: true, // CRITICAL: Allow cookies
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    exposedHeaders: ['set-cookie']
 }));
-app.use(express.json()); // To parse JSON request bodies
 
-//=========================================================================================
-//=========================================================================================
+// --- 3. Body Parser (MUST come after CORS, before routes) ---
+app.use(express.json());
 
-// --- 3. Session Setup ---
+// --- 4. Session Setup (MUST come after body parser, before routes) ---
 app.use(session({
     store: new PgSession({
-        pool: pool, // Use our existing pool
-        tableName: 'user_sessions' // A table to store session data
+        pool: pool,
+        tableName: 'user_sessions'
     }),
-    secret: 'your_very_strong_secret_key_here', // Change this!
+    secret: 'your_very_strong_secret_key_here',
     resave: false,
     saveUninitialized: false,
+    proxy: true, // CRITICAL: Trust the proxy
     cookie: {
         maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-        secure: false // Set to true if using HTTPS
-    }
+        httpOnly: true,
+        secure: false, // FALSE for HTTP (local dev)
+        sameSite: 'lax', // Changed from 'strict' to 'lax'
+        path: '/',
+        domain: undefined // Let the browser set it automatically
+    },
+    name: 'bims.sid',
+    rolling: true // Reset cookie expiration on every response
 }));
+
+// Debug middleware to log every request
+app.use((req, res, next) => {
+    console.log('\n--- NEW REQUEST ---');
+    console.log('Method:', req.method);
+    console.log('Path:', req.path);
+    console.log('Origin:', req.headers.origin);
+    console.log('Cookie Header:', req.headers.cookie);
+    console.log('Session ID:', req.sessionID);
+    console.log('Session User:', req.session.user ? req.session.user.email : 'NONE');
+    next();
+});
 
 // A quick middleware to check if user is authenticated
 const isAuthenticated = (req, res, next) => {
+    console.log('Auth Check - User:', req.session.user ? req.session.user.email : 'MISSING');
+    
     if (req.session.user) {
         next(); // User is logged in, continue
     } else {
+        console.log('❌ Authentication failed - no user in session');
         res.status(401).json({ message: 'Not authenticated' });
     }
 };
 
-// --- 4. API Endpoints ---
+// --- 5. API Endpoints ---
 
 // POST /api/auth/login
 app.post('/api/auth/login', async (req, res) => {
+    console.log('\n🔐 LOGIN ATTEMPT');
     const { email, password } = req.body;
+    
     try {
         const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
         const user = result.rows[0];
 
         if (!user) {
+            console.log('❌ User not found:', email);
             return res.status(404).json({ message: 'User not found' });
         }
 
         const isMatch = await bcrypt.compare(password, user.password_hash);
         if (!isMatch) {
+            console.log('❌ Invalid password for:', email);
             return res.status(400).json({ message: 'Invalid password' });
         }
         
         // Don't store hash in session
-        const userForSession = { ...user };
-        delete userForSession.password_hash;
+        const userForSession = {
+            id: user.id,
+            employee_id: user.employee_id,
+            name: user.name,
+            email: user.email,
+            role: user.role
+        };
         
         // Save user to session
-        req.session.user = userForSession; 
+        req.session.user = userForSession;
         
-        res.status(200).json({ message: 'Login successful', user: userForSession });
+        // Force session save before sending response
+        req.session.save((err) => {
+            if (err) {
+                console.error('❌ Session save error:', err);
+                return res.status(500).json({ message: 'Failed to save session' });
+            }
+            console.log('✅ Login successful');
+            console.log('Session ID:', req.sessionID);
+            console.log('User:', userForSession.email);
+            console.log('Role:', userForSession.role);
+            
+            res.status(200).json({ 
+                message: 'Login successful', 
+                user: userForSession 
+            });
+        });
+        
     } catch (e) {
+        console.error('❌ Login error:', e);
         res.status(500).json({ message: e.message });
     }
 });
 
 // GET /api/auth/me (Check session)
 app.get('/api/auth/me', isAuthenticated, (req, res) => {
-    // If isAuthenticated passes, we have a user
+    console.log('✅ Session valid for:', req.session.user.name);
     res.status(200).json(req.session.user);
 });
 
 // POST /api/auth/logout
 app.post('/api/auth/logout', (req, res) => {
+    console.log('🚪 Logout request');
     req.session.destroy((err) => {
         if (err) {
+            console.error('❌ Logout error:', err);
             return res.status(500).json({ message: 'Could not log out' });
         }
-        res.clearCookie('connect.sid'); // Clear the session cookie
+        res.clearCookie('bims.sid');
+        console.log('✅ Logout successful');
         res.status(200).json({ message: 'Logout successful' });
     });
 });
 
 // GET /api/users (For Admin Panel & Login Dropdown)
 app.get('/api/users', async (req, res) => {
-    // This endpoint is intentionally public to populate the login dropdown.
+    console.log('📋 Fetching users list');
     try {
-        // Select all users but exclude the password hash
-        const result = await pool.query('SELECT id, employee_id, name, email, role FROM users');
+        const result = await pool.query('SELECT id, employee_id, name, email, role FROM users ORDER BY id');
+        console.log(`✅ Found ${result.rows.length} users`);
         res.status(200).json(result.rows);
     } catch (e) {
+        console.error('❌ Error fetching users:', e);
         res.status(500).json({ message: e.message });
     }
 });
 
 // PUT /api/users/:id/role (For Admin Panel)
 app.put('/api/users/:id/role', isAuthenticated, async (req, res) => {
+    console.log('👤 Role change request');
+    console.log('Requester:', req.session.user.email, 'Role:', req.session.user.role);
+    
     if (req.session.user.role !== 'Admin') {
-        return res.status(403).json({ message: 'Forbidden' });
+        console.log('❌ Forbidden: Not an admin');
+        return res.status(403).json({ message: 'Forbidden: Admin access required' });
     }
     
     const { id } = req.params;
     const { role } = req.body;
 
-    // *** FIX 1: Correctly compare string param 'id' with number session 'id' ***
     if (String(id) === String(req.session.user.id)) {
+        console.log('❌ Cannot change own role');
         return res.status(400).json({ message: 'Cannot change your own role' });
     }
 
@@ -142,29 +208,36 @@ app.put('/api/users/:id/role', isAuthenticated, async (req, res) => {
         );
         
         if (result.rows.length === 0) {
+            console.log('❌ User not found:', id);
             return res.status(404).json({ message: 'User not found' });
         }
 
+        console.log('✅ Role updated:', result.rows[0].name, '→', role);
         res.status(200).json({ message: 'Role updated', user: result.rows[0] });
     } catch (e) {
+        console.error('❌ Role update error:', e);
         res.status(500).json({ message: e.message });
     }
 });
 
-// *** FEATURE: POST /api/users (For Admin Panel - Add User) ***
+// POST /api/users (For Admin Panel - Add User)
 app.post('/api/users', isAuthenticated, async (req, res) => {
+    console.log('➕ Add user request');
+    console.log('Requester:', req.session.user.email, 'Role:', req.session.user.role);
+    
     if (req.session.user.role !== 'Admin') {
-        return res.status(403).json({ message: 'Forbidden' });
+        console.log('❌ Forbidden: Not an admin');
+        return res.status(403).json({ message: 'Forbidden: Admin access required' });
     }
 
     const { name, email, employeeId, role, password } = req.body;
 
     if (!name || !email || !employeeId || !role || !password) {
+        console.log('❌ Missing required fields');
         return res.status(400).json({ message: 'All fields are required' });
     }
 
     try {
-        // Hash the password
         const salt = await bcrypt.genSalt(10);
         const passwordHash = await bcrypt.hash(password, salt);
 
@@ -175,18 +248,27 @@ app.post('/api/users', isAuthenticated, async (req, res) => {
             [employeeId, name, email, role, passwordHash]
         );
         
+        console.log('✅ User created:', result.rows[0].name);
         res.status(201).json({ message: 'User created', user: result.rows[0] });
     
     } catch (e) {
-        if (e.code === '23505') { // unique_violation (e.g., email already exists)
+        if (e.code === '23505') {
+            console.log('❌ Duplicate email/employee ID');
             return res.status(409).json({ message: 'Email or Employee ID already exists' });
         }
+        console.error('❌ User creation error:', e);
         res.status(500).json({ message: e.message });
     }
 });
 
-
-// --- 5. Start Server ---
-app.listen(port, () => {
-    console.log(`BIMS backend server running on http://localhost:${port}`);
+// --- 6. Start Server ---
+app.listen(port, '127.0.0.1', () => {
+    console.log('\n=================================');
+    console.log('🚀 BIMS Server Started');
+    console.log('=================================');
+    console.log('URL: http://127.0.0.1:3000');
+    console.log('CORS Origins:');
+    console.log('  - http://127.0.0.1:5500');
+    console.log('  - http://localhost:5500');
+    console.log('=================================\n');
 });
