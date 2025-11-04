@@ -49,7 +49,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const user = currentUser;
         document.getElementById('user-name').textContent = user.name;
         document.getElementById('user-role').textContent = user.role;
-        document.getElementById('user-employee-id').textContent = user.employeeId;
+        document.getElementById('user-employee-id').textContent = user.employee_id;
 
         navLinks.admin.style.display = permissionService.can('VIEW_ADMIN_PANEL') ? 'flex' : 'none';
         navLinks.ledger.style.display = permissionService.can('VIEW_LEDGER') ? 'flex' : 'none';
@@ -237,7 +237,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             price,
             category,
             beforeQuantity, afterQuantity, toLocation,
-            userId: user.id, employeeId: user.employeeId, userName: user.name,
+            userId: user.id, employeeId: user.employee_id, userName: user.name,
             timestamp: new Date().toISOString()
         };
 
@@ -321,7 +321,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 beforeQuantity, 
                 afterQuantity,
                 userId: user.id, 
-                employeeId: user.employeeId, // <-- ADD THIS LINE
+                employeeId: user.employee_id, // <-- ADD THIS LINE
                 userName: user.name, 
                 timestamp: new Date().toISOString() 
             };
@@ -365,7 +365,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             beforeQuantity: { from: beforeFromQty, to: beforeToQty },
             afterQuantity: { from: afterFromQty, to: afterToQty },
             userId: user.id, 
-            employeeId: user.employeeId, 
+            employeeId: user.employee_id,
             userName: user.name, 
             timestamp: new Date().toISOString() 
         };
