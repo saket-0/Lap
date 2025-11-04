@@ -704,7 +704,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 
                 row.innerHTML = `
                     <td class="table-cell font-medium">${user.name}</td>
-                    <td class="table-cell text-slate-500">${user.employeeId}</td>
+                    <td class="table-cell text-slate-500">${user.employee_id}</td>
                     <td class="table-cell text-slate-500">${user.email}</td>
                     <td class="table-cell">
                         <select data-user-id="${user.id}" class="role-select block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" ${isCurrentUser ? 'disabled' : ''}>
