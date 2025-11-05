@@ -131,7 +131,7 @@ body {
     gap: 0.75rem; /* 12px */
     padding: 0.75rem 1rem; /* 12px 16px */
     border-radius: 0.375rem; /* 6px */
-    font-medium;
+    font-medium:500;
     color: #334155; /* slate-700 */
     transition: all 0.2s ease-in-out;
 }
@@ -153,7 +153,7 @@ body {
     padding: 0.75rem 1.5rem; /* 12px 24px */
     text-align: left;
     font-size: 0.75rem; /* 12px */
-    font-medium;
+    font-medium:500;
     color: #475569; /* slate-600 */
     text-transform: uppercase;
     letter-spacing: 0.05em;
